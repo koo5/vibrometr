@@ -132,3 +132,16 @@ class Adafruit_ADXL345_Unified : public Adafruit_Sensor {
   uint8_t _clk, _do, _di, _cs;
   bool    _i2c;
 };
+
+
+typedef Adafruit_ADXL345_Unified Acc;
+
+
+
+void displayAccDetails(Acc &acc);
+void displayDataRate(Acc &acc);
+void displayRange(Acc &acc);
+
+
+
+

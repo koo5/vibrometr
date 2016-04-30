@@ -330,3 +330,113 @@ void Adafruit_ADXL345_Unified::getSensor(sensor_t *sensor) {
   sensor->min_value   = 156.9064F;  /*  16g = 156.9064 m/s^2  */
   sensor->resolution  = 0.03923F;   /*  4mg = 0.0392266 m/s^2 */ 
 }
+
+void displayAccDetails(Acc &acc)
+{
+  sensor_t sensor;
+  acc.getSensor(&sensor);
+  Serial.print  (F("Sensor:       ")); Serial.println(sensor.name);
+  Serial.print  (F("Driver Ver:   ")); Serial.println(sensor.version);
+  Serial.print  (F("Unique ID:    ")); Serial.println(sensor.sensor_id);
+  Serial.print  (F("Max Value:    ")); Serial.print(sensor.max_value); Serial.println(F(" m/s^2"));
+  Serial.print  (F("Min Value:    ")); Serial.print(sensor.min_value); Serial.println(F(" m/s^2"));
+  Serial.print  (F("Resolution:   ")); Serial.print(sensor.resolution); Serial.println(F(" m/s^2"));
+}
+
+/*
+#include <avr/pgmspace.h>
+
+void displayDataRate(Acc &acc)
+{
+  Serial.print  (F("Data Rate:    ")); 
+  Serial.println(s[15-acc.getDataRate()]);
+ 
+  static const char s0[] PROGMEM  = 
+*/
+
+
+void displayDataRate(Acc &acc)
+{
+  Serial.print  (F("Data Rate:    ")); 
+  
+  switch(acc.getDataRate())
+  {
+    case ADXL345_DATARATE_3200_HZ:
+      Serial.print  ("3200 "); 
+      break;
+    case ADXL345_DATARATE_1600_HZ:
+      Serial.print  ("1600 "); 
+      break;
+    case ADXL345_DATARATE_800_HZ:
+      Serial.print  ("800 "); 
+      break;
+    case ADXL345_DATARATE_400_HZ:
+      Serial.print  ("400 "); 
+      break;
+    case ADXL345_DATARATE_200_HZ:
+      Serial.print  ("200 "); 
+      break;
+    case ADXL345_DATARATE_100_HZ:
+      Serial.print  ("100 "); 
+      break;
+    case ADXL345_DATARATE_50_HZ:
+      Serial.print  ("50 "); 
+      break;
+    case ADXL345_DATARATE_25_HZ:
+      Serial.print  ("25 "); 
+      break;
+    case ADXL345_DATARATE_12_5_HZ:
+      Serial.print  ("12.5 "); 
+      break;
+    case ADXL345_DATARATE_6_25HZ:
+      Serial.print  ("6.25 "); 
+      break;
+    case ADXL345_DATARATE_3_13_HZ:
+      Serial.print  ("3.13 "); 
+      break;
+    case ADXL345_DATARATE_1_56_HZ:
+      Serial.print  ("1.56 "); 
+      break;
+    case ADXL345_DATARATE_0_78_HZ:
+      Serial.print  ("0.78 "); 
+      break;
+    case ADXL345_DATARATE_0_39_HZ:
+      Serial.print  ("0.39 "); 
+      break;
+    case ADXL345_DATARATE_0_20_HZ:
+      Serial.print  ("0.20 "); 
+      break;
+    case ADXL345_DATARATE_0_10_HZ:
+      Serial.print  ("0.10 "); 
+      break;
+    default:
+      Serial.print  ("???? "); 
+      break;
+  }  
+  Serial.println(" Hz");  
+}
+
+void displayRange(Acc &acc)
+{
+  Serial.print  (F("Range:         +/- ")); 
+  
+  switch(acc.getRange())
+  {
+    case ADXL345_RANGE_16_G:
+      Serial.print  ("16 "); 
+      break;
+    case ADXL345_RANGE_8_G:
+      Serial.print  ("8 "); 
+      break;
+    case ADXL345_RANGE_4_G:
+      Serial.print  ("4 "); 
+      break;
+    case ADXL345_RANGE_2_G:
+      Serial.print  ("2 "); 
+      break;
+    default:
+      Serial.print  ("?? "); 
+      break;
+  }  
+  Serial.println(" g");  
+}
