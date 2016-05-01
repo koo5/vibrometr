@@ -103,6 +103,11 @@ String now_string(void)
     return String("");
   }
  
+  return time_string(tm);
+}
+
+String time_string(tmElements_t &tm)
+{
   char t[40];
   sprintf(t, "%04d/%02d/%02d %02d:%02d:%02d",
     tmYearToCalendar(tm.Year),
@@ -113,6 +118,7 @@ String now_string(void)
     tm.Second);
   return String(t);
 }
+
 
 void test_rtc() {
   Serial.println(F("DS1307RTC Read Test"));
@@ -234,6 +240,213 @@ void init_ram(void)
 
 
 
+
+
+
+
+bool init_acc(Acc &acc)
+{
+  if(!acc.begin())
+  {
+    Serial.println(F("not detected"));
+    return false;
+  }
+  Wire.setClock(400000L);
+  //SPI.setClockDivider(SPI_CLOCK_DIV2);
+  acc.setDataRate(ADXL345_DATARATE_800_HZ);
+  //400 kHz I2C is 800 Hz
+  
+  acc.setRange(ADXL345_RANGE_16_G);
+
+  acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream
+
+
+  return true;
+}
+
+void test_acc(Acc &acc)
+{
+  if (!init_acc(acc))
+    return;
+
+
+  int nsamples = ramsz/2/3;
+    
+  displayAccDetails(acc);  
+  displayDataRate(acc);
+  displayRange(acc);
+  Serial.println("");
+
+
+  SPI.begin();
+  digitalWrite(sram.cs_pin, LOW);
+  SPI.transfer(SRAM_WRITE);
+  //adresa
+  SPI.transfer(0);
+  SPI.transfer(0);
+  SPI.transfer(0);
+
+
+  
+  tmElements_t start, end;
+  RTC.read(start);
+  RTC.read(end);
+  time_t st = makeTime(start);
+  time_t et = makeTime(end);
+  
+  
+  
+  // Enable measurements
+  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
+
+  long s;
+  byte status;
+  int16_t xyz[3];
+  for(s = 0; s < nsamples; s++)
+  {
+
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    i2cwrite(ADXL345_REG_DATAX0);
+    Wire.endTransmission();
+    Wire.requestFrom(ADXL345_ADDRESS, 8);
+
+  //  for (int a = 0; a< 3; a++)
+  //	xyz[a] = (uint16_t)(i2cread() | (i2cread() << 8));  
+    
+
+    for (int a = 0; a < 6; a++)
+        SPI.transfer(i2cread());
+
+    i2cread(); // FIFO_CTL
+    status = i2cread();
+
+    entries = status & 0b111111;
+    Serial.println(entries);
+    if (entries > 30) 
+    	Serial.println(F("overflow"));
+
+  }
+
+  acc.writeRegister(ADXL345_REG_POWER_CTL, 0);
+  digitalWrite(sram.cs_pin, HIGH);
+
+
+
+  RTC.read(end);
+
+
+
+  //flush
+  for (int i = 0; i < 50; i++)
+  {
+    Wire.requestFrom(ADXL345_ADDRESS, 1);
+    i2cread();
+  }
+
+
+
+
+
+
+
+  digitalWrite(sram.cs_pin, LOW);
+  SPI.transfer(SRAM_READ);
+  //adresa
+  SPI.transfer(0);
+  SPI.transfer(0);
+  SPI.transfer(0);
+
+  
+  for(s = 0; s < nsamples; s++)
+  {
+    for (int a = 0; a< 3; a++)
+      xyz[a] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
+     
+    if(s < 3)
+    {
+      Serial.print(F("X: ")); Serial.print(xyz[0]);
+      Serial.print(F("  Y: ")); Serial.print(xyz[1]);
+      Serial.print(F("  Z: ")); Serial.println(xyz[2]); 
+    }
+    if(s == 3)
+      Serial.println(F("...\n"));
+    
+    
+     
+      
+  }
+
+
+  digitalWrite(sram.cs_pin, HIGH);
+  Serial.println(F("done"));
+
+  SPI.end();
+
+}
+
+
+
+
+
+
+
+void loop(void) 
+{
+  
+  test_rtc();
+divider();  
+  test_ram();
+divider();
+
+Acc accspi = Acc(13, 12, 11, csacc);
+Acc acctwi = Acc(12345);
+Serial.println(F("spi acc.."));
+  test_acc(accspi);
+Serial.println(F("twi acc.."));
+  test_acc(acctwi);
+
+divider();
+  test_sd();
+divider();
+  write_time();
+divider();
+  delay(500);
+}
+
+void setup(void) 
+{
+  Serial.begin(9600);
+  
+  digitalWrite(csram, 1);
+  digitalWrite(cssd, 1);
+  digitalWrite(csacc, 1);  
+  
+  pinMode(csram, 1);
+  pinMode(cssd, 1);
+  pinMode(csacc, 1);
+
+  init_ram();
+
+  divider(); 
+}
+
+void divider(void)
+{
+
+  Serial.println("");
+    Serial.println(F("------------------------------------"));
+  Serial.println("");
+
+}
+
+
+
+
+
+
+
+
+
 void test_sd(void)
 {
   Sd2Card card;
@@ -338,101 +551,4 @@ void write_time(void)
 }
 
 
-
-
-
-
-
-bool init_acc(Acc &acc)
-{
-  if(!acc.begin())
-  {
-    Serial.println(F("not detected"));
-    return false;
-  }
-  Wire.setClock(400000L);
-  //SPI.setClockDivider(SPI_CLOCK_DIV2);
-  acc.setDataRate(ADXL345_DATARATE_800_HZ);
-  
-  acc.setRange(ADXL345_RANGE_16_G);
-  return true;
-}
-
-void test_acc(Acc &acc)
-{
-  if (!init_acc(acc))
-    return;
-    
-  displayAccDetails(acc);  
-  displayDataRate(acc);
-  displayRange(acc);
-  uSerial.println("");
-  
-  long x;
-  for(x = 0; x < 100; x++)
-  {
-    sensors_event_t event; 
-    acc.getEvent(&event);
- 
-    Serial.print(F("X: ")); Serial.print(event.acceleration.x);
-    Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
-    Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
-  }
-  
-}
-
-
-
-
-
-
-
-void loop(void) 
-{
-  
-  test_rtc();
-divider();  
-  test_ram();
-divider();
-
-Acc accspi = Acc(13, 12, 11, csacc);
-Acc acctwi = Acc(12345);
-Serial.println(F("spi acc.."));
-  test_acc(accspi);
-Serial.println(F("twi acc.."));
-  test_acc(acctwi);
-
-divider();
-  test_sd();
-divider();
-  write_time();
-divider();
-  delay(500);
-}
-
-void setup(void) 
-{
-  Serial.begin(9600);
-  
-  digitalWrite(csram, 1);
-  digitalWrite(cssd, 1);
-  digitalWrite(csacc, 1);  
-  
-  pinMode(csram, 1);
-  pinMode(cssd, 1);
-  pinMode(csacc, 1);
-
-  init_ram();
-
-  divider(); 
-}
-
-void divider(void)
-{
-
-  Serial.println("");
-    Serial.println(F("------------------------------------"));
-  Serial.println("");
-
-}
 

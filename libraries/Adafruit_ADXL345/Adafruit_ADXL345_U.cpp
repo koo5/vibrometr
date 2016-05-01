@@ -226,9 +226,6 @@ bool Adafruit_ADXL345_Unified::begin() {
     Serial.println(deviceid, HEX);
     return false;
   }
-  
-  // Enable measurements
-  writeRegister(ADXL345_REG_POWER_CTL, 0x08);  
     
   return true;
 }
@@ -240,7 +237,7 @@ bool Adafruit_ADXL345_Unified::begin() {
 /**************************************************************************/
 void Adafruit_ADXL345_Unified::setRange(range_t range)
 {
-  /* Red the data format register to preserve bits */
+  /* Read the data format register to preserve bits */
   uint8_t format = readRegister(ADXL345_REG_DATA_FORMAT);
 
   /* Update the data rate */
