@@ -124,12 +124,18 @@ class Adafruit_ADXL345_Unified : public Adafruit_Sensor {
   int16_t    getX(void), getY(void), getZ(void);
 
 
+
+
+
   bool    _i2c; //ro
+  uint8_t  i2cread(void);
+  void     i2cwrite(uint8_t x);
+
+
+
 
  private:
 
-  inline uint8_t  i2cread(void);
-  inline void     i2cwrite(uint8_t x);
 
   int32_t _sensorID;
   range_t _range;

@@ -173,7 +173,7 @@ void test_ram() {
   const uint32_t bs = 1024L*256L;
   Serial.println(F("sram test:"));
   SPI.begin();
-  for(address = 0; address < ramsz; address+=bs)
+  for(address = 0; address < /*ramsz*/3; address+=bs)
   {
      Serial.print(address);
      Serial.print(":");
@@ -264,13 +264,50 @@ bool init_acc(Acc &acc)
   return true;
 }
 
+
+void acc_flush()
+{
+  //flush
+  for (int i = 0; i < 50; i++)
+  {
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    Wire.write(ADXL345_REG_DATAX0);
+    Wire.endTransmission();
+    Wire.requestFrom(ADXL345_ADDRESS, 1);
+    Wire.read();
+  }
+}
+
+
+void acc_wait(void)
+{
+  while(true)
+  {
+    byte status;
+
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    Wire.write(ADXL345_REG_FIFO_STATUS);
+    Wire.endTransmission();
+    Wire.requestFrom(ADXL345_ADDRESS, 1);
+
+    status = Wire.read();
+
+    byte entries;
+    entries = status & 0b111111;
+    if (entries != 0) 
+      break;
+    Serial.println(F("waiting for samples.."));
+  }
+}
+
+
 void test_acc(Acc &acc)
 {
   if (!init_acc(acc))
     return;
 
 
-  int nsamples = ramsz/2/3;
+  const uint32_t nsamples = 512;//ramsz/6L;
     
   displayAccDetails(acc);  
   displayDataRate(acc);
@@ -291,39 +328,47 @@ void test_acc(Acc &acc)
   tmElements_t start, end;
   RTC.read(start);
   RTC.read(end);
-  time_t st = makeTime(start);
-  time_t et = makeTime(end);
+  //time_t st = makeTime(start);
+  //time_t et = makeTime(end);
   
+
+  acc_flush();
   
   
   // Enable measurements
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
 
-  long s;
+
+  acc_wait();
+
+  
+
+  unsigned long s;
   byte status;
   int16_t xyz[3];
   for(s = 0; s < nsamples; s++)
   {
 
     Wire.beginTransmission(ADXL345_ADDRESS);
-    i2cwrite(ADXL345_REG_DATAX0);
+    Wire.write(ADXL345_REG_DATAX0);
     Wire.endTransmission();
     Wire.requestFrom(ADXL345_ADDRESS, 8);
 
-  //  for (int a = 0; a< 3; a++)
-  //	xyz[a] = (uint16_t)(i2cread() | (i2cread() << 8));  
-    
-
     for (int a = 0; a < 6; a++)
-        SPI.transfer(i2cread());
+        SPI.transfer(Wire.read());
 
-    i2cread(); // FIFO_CTL
-    status = i2cread();
+    Wire.read(); // FIFO_CTL
+    status = Wire.read();
 
+    {
+    byte entries;
     entries = status & 0b111111;
-    Serial.println(entries);
+    //Serial.println(entries);
     if (entries > 30) 
     	Serial.println(F("overflow"));
+    if(entries == 0)
+      acc_wait();
+    }
 
   }
 
@@ -332,20 +377,13 @@ void test_acc(Acc &acc)
 
 
 
+  Serial.println(F("sampling done"));
+
   RTC.read(end);
 
 
 
-  //flush
-  for (int i = 0; i < 50; i++)
-  {
-    Wire.requestFrom(ADXL345_ADDRESS, 1);
-    i2cread();
-  }
-
-
-
-
+  acc_flush();
 
 
 

@@ -36,7 +36,7 @@
     @brief  Abstract away platform differences in Arduino wire library
 */
 /**************************************************************************/
-inline uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
+/*inline*/ uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
   #if ARDUINO >= 100
   return Wire.read();
   #else
@@ -49,7 +49,7 @@ inline uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
     @brief  Abstract away platform differences in Arduino wire library
 */
 /**************************************************************************/
-inline void Adafruit_ADXL345_Unified::i2cwrite(uint8_t x) {
+/*inline*/ void Adafruit_ADXL345_Unified::i2cwrite(uint8_t x) {
   #if ARDUINO >= 100
   Wire.write((uint8_t)x);
   #else
