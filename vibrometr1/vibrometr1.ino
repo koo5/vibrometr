@@ -1,3 +1,6 @@
+#include "fix_fft.h"
+
+
 #include <Wire.h>
 #include <Adafruit_ADXL345_U.h>
 
@@ -265,10 +268,9 @@ bool init_acc(Acc &acc)
 }
 
 
-void acc_flush()
+void acc_flush(unsigned int count = 50)
 {
-  //flush
-  for (int i = 0; i < 50; i++)
+  for (int i = 0; i < count; i++)
   {
     Wire.beginTransmission(ADXL345_ADDRESS);
     Wire.write(ADXL345_REG_DATAX0);
@@ -296,7 +298,7 @@ void acc_wait(void)
     entries = status & 0b111111;
     if (entries != 0) 
       break;
-    Serial.println(F("waiting for samples.."));
+  //  Serial.println(F("waiting for samples.."));
   }
 }
 
@@ -307,7 +309,7 @@ void test_acc(Acc &acc)
     return;
 
 
-  const uint32_t nsamples = 512;//ramsz/6L;
+  const uint32_t nsamples = 128*10;//(ramsz/6L);
     
   displayAccDetails(acc);  
   displayDataRate(acc);
@@ -316,6 +318,27 @@ void test_acc(Acc &acc)
 
 
   SPI.begin();
+
+
+
+
+  acc_flush();
+  
+  
+  // Enable measurements
+  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
+
+
+  acc_wait();
+  acc_flush();
+
+
+while(true)
+{
+
+  acc_flush();
+
+  
   digitalWrite(sram.cs_pin, LOW);
   SPI.transfer(SRAM_WRITE);
   //adresa
@@ -330,17 +353,6 @@ void test_acc(Acc &acc)
   RTC.read(end);
   //time_t st = makeTime(start);
   //time_t et = makeTime(end);
-  
-
-  acc_flush();
-  
-  
-  // Enable measurements
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
-
-
-  acc_wait();
-
   
 
   unsigned long s;
@@ -372,9 +384,7 @@ void test_acc(Acc &acc)
 
   }
 
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0);
   digitalWrite(sram.cs_pin, HIGH);
-
 
 
   Serial.println(F("sampling done"));
@@ -382,47 +392,142 @@ void test_acc(Acc &acc)
   RTC.read(end);
 
 
-
-  acc_flush();
-
-
-
-  digitalWrite(sram.cs_pin, LOW);
-  SPI.transfer(SRAM_READ);
-  //adresa
-  SPI.transfer(0);
-  SPI.transfer(0);
-  SPI.transfer(0);
-
-  
-  for(s = 0; s < nsamples; s++)
-  {
-    for (int a = 0; a< 3; a++)
-      xyz[a] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
-     
-    if(s < 3)
-    {
-      Serial.print(F("X: ")); Serial.print(xyz[0]);
-      Serial.print(F("  Y: ")); Serial.print(xyz[1]);
-      Serial.print(F("  Z: ")); Serial.println(xyz[2]); 
-    }
-    if(s == 3)
-      Serial.println(F("...\n"));
-    
-    
-     
-      
-  }
-
+  fft_out(nsamples);
 
   digitalWrite(sram.cs_pin, HIGH);
   Serial.println(F("done"));
+  
+}
+acc.writeRegister(ADXL345_REG_POWER_CTL, 0);
 
-  SPI.end();
-
+SPI.end();
 }
 
+void fft_out(const uint32_t nsamples )
+{
+  
+  digitalWrite(sram.cs_pin, LOW);
+  SPI.transfer(SRAM_READ);
+  SPI.transfer(0);  SPI.transfer(0);  SPI.transfer(0);
+  int16_t off[3];
+  off [0] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
+  off [1] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
+  off [2] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
+  digitalWrite(sram.cs_pin, HIGH);   
+  digitalWrite(sram.cs_pin, HIGH);   
+  digitalWrite(sram.cs_pin, LOW);
+  SPI.transfer(SRAM_READ);
+  SPI.transfer(0);  SPI.transfer(0);  SPI.transfer(0);
 
+
+  const uint16_t F_SAMPLE = 800;
+
+
+  unsigned long long int block;
+  for(block = 0; block < nsamples; block+=128)
+  {
+
+    char re[128];
+    char im[128];
+  
+    byte s;
+    for (s = 0; s < 128; s++)
+    {
+      int16_t xyz[3];
+      
+      byte i0,i1;
+      int16_t v;
+      
+      for (int a = 0; a< 3; a++)
+      {
+        
+        i0 = SPI.transfer(0);
+        i1 = SPI.transfer(0);
+        v = (int16_t)(i0 | (i1 << 8));
+        xyz[a] = v - off[a];
+      }
+/*i0 = SPI.transfer(0);
+        i1 = SPI.transfer(0);*/
+//      Serial.print(F("X: ")); Serial.print(xyz[0]);
+//      Serial.print(F("  Y: ")); Serial.print(xyz[1]);
+/*
+      Serial.print(F("  Z: ")); 
+      Serial.print(i1, BIN);
+      Serial.print(F(" ")); 
+      Serial.print(i0, BIN);
+      Serial.print(F(" "));
+      Serial.println(v); 
+*/
+      
+      int16_t l = xyz[2];
+                  
+      if (l > 127 || l < -126)
+      {
+        Serial.println(""); 
+        Serial.println(F("out of range:)"));
+      }
+
+      
+      char vv = l;//sqrt(xyz[0]*xyz[0] + xyz[1]*xyz[1] + xyz[2]*xyz[2]);
+      //Serial.print(F(" v: ")); Serial.print( vv, DEC);
+
+      float fs = s;
+
+      re[s] = vv;//50*sin(fs / 5.0f) + 50*sin(fs*3);
+      im[s] = 0;
+    }
+
+    fix_fft(re,im,7,0);
+    print_fft(re,im);
+
+  }
+}
+
+void print_fft(char *re, char*im)
+{
+  int i,j,largest;
+  char str[65];
+  char linfo[6];
+
+  str[64] = 0;  
+  largest = 0;
+  // Find the largest entry which will determine how many lines
+  // are needed to print the whole histogram
+  for (i=0; i< 64;i++){
+    re[i] = sqrt(re[i] * re[i] + im[i] * im[i]);
+    if(re[i] > largest)largest = re[i];
+  }
+  // print a blank line just in case there's
+  // garbage when the Serial monitor starts up
+  Serial.println("");
+  // and the title
+  // print the histogram starting with the highest amplitude
+  // and working our way back down to zero.
+  for(j=largest;j >= 0;j--) {
+    for(i=0;i<64;i++) {
+      // If the magnitude of this bin is at least as large as
+      // the current magnitude we print an asterisk
+      if(re[i] >= j)str[i] = '*';
+      // otherwise print a space
+      else str[i] = ' ';
+    }
+    sprintf(linfo,"%3d ",j);
+    Serial.print(linfo);
+    Serial.println(str);
+  }
+  // print the bin numbers along the bottom
+/*  Serial.print("    ");
+  for(i=0;i<64;i++) {
+    Serial.print(i%10);
+  }
+  Serial.println("");
+  Serial.print("    ");
+  for(i=0;i<64;i++) {
+    if(i < 10)Serial.print(" ");
+    else Serial.print((i/10)%10);
+  }
+  Serial.println("");*/
+}
 
 
 
@@ -433,7 +538,7 @@ void loop(void)
   
   test_rtc();
 divider();  
-  test_ram();
+  //test_ram();
 divider();
 
 Acc accspi = Acc(13, 12, 11, csacc);
@@ -453,7 +558,7 @@ divider();
 
 void setup(void) 
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   
   digitalWrite(csram, 1);
   digitalWrite(cssd, 1);
