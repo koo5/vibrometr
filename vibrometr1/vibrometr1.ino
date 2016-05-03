@@ -1,3 +1,6 @@
+/*todo reset i2c po resetu arduina?*/
+
+
 #include "fix_fft.h"
 
 
@@ -41,9 +44,9 @@ void rtc_auto_set(void)
   }
   else
   {
-    Serial.print(F("Could not parse info from the compiler, Time=\""));
+    Serial.print(F("Could not parse info from the compiler, __TIME__=\""));
     Serial.print(__TIME__);
-    Serial.print("\", Date=\"");
+    Serial.print("\", __DATE__=\"");
     Serial.print(__DATE__);
     Serial.println("\"");
   }
@@ -403,25 +406,19 @@ acc.writeRegister(ADXL345_REG_POWER_CTL, 0);
 SPI.end();
 }
 
+
+
 void fft_out(const uint32_t nsamples )
 {
   
-  digitalWrite(sram.cs_pin, LOW);
-  SPI.transfer(SRAM_READ);
-  SPI.transfer(0);  SPI.transfer(0);  SPI.transfer(0);
-  int16_t off[3];
-  off [0] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
-  off [1] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
-  off [2] = (uint16_t)(SPI.transfer(0) | (SPI.transfer(0) << 8));
-  digitalWrite(sram.cs_pin, HIGH);   
-  digitalWrite(sram.cs_pin, HIGH);   
+  
   digitalWrite(sram.cs_pin, LOW);
   SPI.transfer(SRAM_READ);
   SPI.transfer(0);  SPI.transfer(0);  SPI.transfer(0);
 
 
   const uint16_t F_SAMPLE = 800;
-
+  
 
   unsigned long long int block;
   for(block = 0; block < nsamples; block+=128)
@@ -429,45 +426,57 @@ void fft_out(const uint32_t nsamples )
 
     char re[128];
     char im[128];
-  
+
+    int16_t off[3];
+    int16_t mins[3] = { 32767, 32767, 32767};
+    int16_t maxs[3] = {-32768,-32768,-32768};
+    
     byte s;
     for (s = 0; s < 128; s++)
     {
       int16_t xyz[3];
       
-      byte i0,i1;
+      char i0,i1;
       int16_t v;
       
-      for (int a = 0; a< 3; a++)
+      for (int a = 0; a < 3; a++)
       {
         
         i0 = SPI.transfer(0);
         i1 = SPI.transfer(0);
-        v = (int16_t)(i0 | (i1 << 8));
-        xyz[a] = v - off[a];
+        v = i0 | (i1 << 8);
+        xyz[a] = v;// - off[a];
       }
-/*i0 = SPI.transfer(0);
-        i1 = SPI.transfer(0);*/
-//      Serial.print(F("X: ")); Serial.print(xyz[0]);
-//      Serial.print(F("  Y: ")); Serial.print(xyz[1]);
-/*
-      Serial.print(F("  Z: ")); 
-      Serial.print(i1, BIN);
-      Serial.print(F(" ")); 
-      Serial.print(i0, BIN);
-      Serial.print(F(" "));
-      Serial.println(v); 
-*/
+      if (s == 0)
+        for (int a = 0; a < 3; a++)
+          off[a] = xyz[a];
+        
+      for (int a = 0; a < 3; a++)
+        xyz[a] -= off[a];
+         
+
+      for (int a = 0; a < 3; a++)
+      {
+        if(mins[a] > xyz[a])
+          mins[a] = xyz[a];
+        if(maxs[a] < xyz[a])
+          maxs[a] = xyz[a];
+      }
       
       int16_t l = xyz[2];
                   
       if (l > 127 || l < -126)
       {
         Serial.println(""); 
-        Serial.println(F("out of range:)"));
+        Serial.println(F("out of char range:)"));
       }
+/*
 
-      
+      Serial.print(F("X: ")); Serial.print(xyz[0]);
+      Serial.print(F("  Y: ")); Serial.print(xyz[1]);
+      Serial.print(F("  Z: ")); Serial.println(xyz[2]);
+
+  */    
       char vv = l;//sqrt(xyz[0]*xyz[0] + xyz[1]*xyz[1] + xyz[2]*xyz[2]);
       //Serial.print(F(" v: ")); Serial.print( vv, DEC);
 
@@ -475,6 +484,12 @@ void fft_out(const uint32_t nsamples )
 
       re[s] = vv;//50*sin(fs / 5.0f) + 50*sin(fs*3);
       im[s] = 0;
+    }
+
+    Serial.print(F("noise:"));
+    for (char a = 0; a < 3; a++)
+    {
+      Serial.print((char)('X' + a)); Serial.print(maxs[a] - mins[a]); Serial.print("   ");
     }
 
     fix_fft(re,im,7,0);
@@ -585,6 +600,73 @@ void divider(void)
 
 
 
+void sd_out(const uint32_t nsamples )
+{
+/*
+  Sd2Card card;
+  
+  if (!card.init()) {
+    Serial.println(F("SD initialization failed."));
+   return;
+  }
+
+  SdVolume volume;
+  
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!volume.init(card)) {
+    Serial.println(F("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card"));
+    return;
+  }
+
+  SdVolume volume;
+  
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!volume.init(card)) {
+    Serial.println(F("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card"));
+    return;
+  }
+*/
+
+
+  SDClass sd;
+  if (!sd.begin()) {
+    Serial.println(F("SD err"));
+    return;
+  }
+   
+  File file = sd.open("mereni.csv", FILE_WRITE);
+  if (! file) 
+    Serial.println(F("error opening mereni.csv"));
+  
+  file.print(now_string());
+  file.println(",,,");
+  
+  sd.end();
+  
+  }
+  
+  
+  digitalWrite(sram.cs_pin, LOW);
+  SPI.transfer(SRAM_READ);
+  SPI.transfer(0);  SPI.transfer(0);  SPI.transfer(0);
+
+  uint32_t s;
+  for (s = 0; s < nsamples; s++)
+  {
+      int16_t xyz[3];
+      
+      char i0,i1;
+      int16_t v;
+      
+      for (int a = 0; a < 3; a++)
+      {
+        
+        i0 = SPI.transfer(0);
+        i1 = SPI.transfer(0);
+        v = i0 | (i1 << 8);
+        xyz[a] = v;
+      }
+  
 
 
 
@@ -694,4 +776,29 @@ void write_time(void)
 }
 
 
+      /*
+SPI.transfer(0); SPI.transfer(0); xyz[2]=0;
+      Serial.print((byte)i1, BIN);
+      Serial.print(F(" ")); 
+      Serial.print((byte)i0, BIN);
+      Serial.print(F(" "));
+      Serial.println(v); 
+*/
 
+/*
+ * > - uvidime jak rychle to pujde a pak jak dlouhy maximalni casovy usek s co nejrychlejsim vzorkovanim se vejde do pameti
+> - zapsat data z pameti na kartu a pak pokracovat v dalsim nabirani
+>
+> Data na kartu zapisujte rekneme ve formatu, prvni radek hlavicka
+> HH:MM:SS DD-MM-YYYY
+> (vase ostatni udaje)
+> X, Y, Z
+> a pak uz jenom data na kazdy radek tri cisla oddelena carkou znamenajici X,Y,Z
+
+
+> Tedy ted hlavne udelat tu zakladni merici smycku popsanou vyse, aby behala spolehlive a naber dat bylo co nejpravidelnejsi. Ukladani na kartu pak, to uz samozrejme nijak rovnomerne byt nemusi, to uz jenom co nejrychleji, ale to vzorkovani ze senzoru musi byt pravidelne, protoze jinak by se z toho nedaly vydolovat zadne uzitecne udaje.
+
+
+
+*/
+ */

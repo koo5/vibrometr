@@ -238,7 +238,7 @@ bool Adafruit_ADXL345_Unified::begin() {
 void Adafruit_ADXL345_Unified::setRange(range_t range)
 {
   /* Read the data format register to preserve bits */
-  uint8_t format = readRegister(ADXL345_REG_DATA_FORMAT);
+  uint8_t format = getRange();
 
   /* Update the data rate */
   format &= ~0x0F;
@@ -261,8 +261,8 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
 /**************************************************************************/
 range_t Adafruit_ADXL345_Unified::getRange(void)
 {
-  /* Red the data format register to preserve bits */
-  return (range_t)(readRegister(ADXL345_REG_DATA_FORMAT) & 0x03);
+  /* Read the data format register to preserve bits */
+  return (range_t)(readRegister(ADXL345_REG_DATA_FORMAT) & 0b11);
 }
 
 /**************************************************************************/
