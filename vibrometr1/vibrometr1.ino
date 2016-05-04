@@ -264,7 +264,9 @@ bool init_acc(Acc &acc)
   
   acc.setRange(ADXL345_RANGE_16_G);
 
-  acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream
+  acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream mode
+  
+  acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b01000000);//DATA_READY (na INT1)
 
 
   return true;
