@@ -250,7 +250,7 @@ void init_ram(void)
 
 
 
-
+/*
 bool init_acc(Acc &acc)
 {
   if(!acc.begin())
@@ -401,7 +401,7 @@ acc.writeRegister(ADXL345_REG_POWER_CTL, 0);
 
 SPI.end();
 }
-
+*/
 
 
 void fft_out(const uint32_t nsamples )
@@ -509,7 +509,6 @@ void fft_out(const uint32_t nsamples )
 
 
 
-/*
 
 
 
@@ -522,14 +521,13 @@ bool init_acc(Acc &acc)
   }
   Wire.setClock(400000L);
   //SPI.setClockDivider(SPI_CLOCK_DIV2);
-  acc.setDataRate(ADXL345_DATARATE_800_HZ);
+  acc.setDataRate(ADXL345_DATARATE_1600_HZ);
   //400 kHz I2C is 800 Hz
   
   acc.setRange(ADXL345_RANGE_16_G);
-
   acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream mode
+  acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b10000000);//DATA_READY (na INT1)
   
-  acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b01000000);//DATA_READY (na INT1)
 
 
   return true;
@@ -556,17 +554,20 @@ void acc_wait(void)
     byte status;
 
     Wire.beginTransmission(ADXL345_ADDRESS);
-    Wire.write(ADXL345_REG_FIFO_STATUS);
+    //Wire.write(ADXL345_REG_FIFO_STATUS);
+    Wire.write(ADXL345_REG_INT_SOURCE);
     Wire.endTransmission();
     Wire.requestFrom(ADXL345_ADDRESS, 1);
 
     status = Wire.read();
 
-    byte entries;
+    /*byte entries;
     entries = status & 0b111111;
     if (entries != 0) 
       break;
-  //  Serial.println(F("waiting for samples.."));
+      */
+    if (status & (1<<7)) break;
+    //Serial.println(F("waiting for samples.."));
   }
 }
 
@@ -605,7 +606,7 @@ while(true)
 {
 
   acc_flush();
-
+  bool fifo_is_empty = true;
   
   digitalWrite(sram.cs_pin, LOW);
   SPI.transfer(SRAM_WRITE);
@@ -618,9 +619,7 @@ while(true)
   
   tmElements_t start, end;
   RTC.read(start);
-  Serial.println("1");  
   RTC.read(end);
-  Serial.println("2");
   //time_t st = makeTime(start);
   //time_t et = makeTime(end);
   
@@ -630,7 +629,7 @@ while(true)
   int16_t xyz[3];
   Serial.print(F("getting "));
   Serial.print(nsamples);
-  Serial.println(F(" samples"));
+  Serial.println(F(" samples..."));
   for(s = 0; s < nsamples; s++)
   {
 
@@ -642,7 +641,7 @@ while(true)
     for (int a = 0; a < 6; a++)
         SPI.transfer(Wire.read());
 
-    Wire.read(); // FIFO_CTL
+    Wire.read(); // FIFO_CTL zahodime
     status = Wire.read();
 
     {
@@ -652,11 +651,16 @@ while(true)
     if (entries > 30) 
     	Serial.println(F("overflow"));
     if(entries == 0)
-      acc_wait();
+    {
+      if (fifo_is_empty)
+        acc_wait();
+      else
+        fifo_is_empty = true;
     }
-
+    else
+      fifo_is_empty = false;
+    }
   }
-
   digitalWrite(sram.cs_pin, HIGH);
 
 
@@ -665,7 +669,7 @@ while(true)
   RTC.read(end);
 
 
-  fft_out(nsamples);
+  //fft_out(nsamples);
 
   digitalWrite(sram.cs_pin, HIGH);
   Serial.println(F("done"));
@@ -676,99 +680,6 @@ acc.writeRegister(ADXL345_REG_POWER_CTL, 0);
 SPI.end();
 }
 
-
-
-void fft_out(const uint32_t nsamples )
-{
-  
-  
-  digitalWrite(sram.cs_pin, LOW);
-  SPI.transfer(SRAM_READ);
-  SPI.transfer(0);  SPI.transfer(0);  SPI.transfer(0);
-
-
-  const uint16_t F_SAMPLE = 800;
-  
-
-  unsigned long long int block;
-  for(block = 0; block < nsamples; block+=128)
-  {
-
-    char re[128];
-    char im[128];
-
-    int16_t off[3];
-    int16_t mins[3] = { 32767, 32767, 32767};
-    int16_t maxs[3] = {-32768,-32768,-32768};
-    
-    byte s;
-    for (s = 0; s < 128; s++)
-    {
-      int16_t xyz[3];
-      
-      char i0,i1;
-      int16_t v;
-      
-      for (int a = 0; a < 3; a++)
-      {
-        
-        i0 = SPI.transfer(0);
-        i1 = SPI.transfer(0);
-        v = i0 | (i1 << 8);
-        xyz[a] = v;// - off[a];
-      }
-      if (s == 0)
-        for (int a = 0; a < 3; a++)
-          off[a] = xyz[a];
-        
-      for (int a = 0; a < 3; a++)
-        xyz[a] -= off[a];
-         
-
-      for (int a = 0; a < 3; a++)
-      {
-        if(mins[a] > xyz[a])
-          mins[a] = xyz[a];
-        if(maxs[a] < xyz[a])
-          maxs[a] = xyz[a];
-      }
-      
-      int16_t l = xyz[2];
-                  
-      if (l > 127 || l < -126)
-      {
-        Serial.println(""); 
-        Serial.println(F("out of char range:)"));
-      }
-
-
-      //Serial.print(F("X: ")); Serial.print(xyz[0]);
-      //Serial.print(F("  Y: ")); Serial.print(xyz[1]);
-      //Serial.print(F("  Z: ")); Serial.println(xyz[2]);
-
-      
-      char vv = l;//sqrt(xyz[0]*xyz[0] + xyz[1]*xyz[1] + xyz[2]*xyz[2]);
-      //Serial.print(F(" v: ")); Serial.print( vv, DEC);
-
-      float fs = s;
-
-      re[s] = vv;//50*sin(fs / 5.0f) + 50*sin(fs*3);
-      im[s] = 0;
-    }
-
-    Serial.print(F("noise:"));
-    for (byte a = 0; a < 3; a++)
-    {
-      Serial.print((char)('X' + a)); Serial.print(maxs[a] - mins[a]); Serial.print("   ");
-    }
-
-    fix_fft(re,im,7,0);
-    print_fft(re,im);
-
-  }
-}
-
-*/
 
 
 void print_fft(char *re, char*im)

@@ -241,12 +241,14 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
   uint8_t format = getRange();
 
   /* Update the data rate */
-  format &= ~0x0F;
+  format &= ~0x0F; //clear full_res, justify and range
   format |= range;
   
-  /* Make sure that the FULL-RES bit is enabled for range scaling */
-  format |= 0x08;
-  
+  /* FULL-RES enable  */
+  format |= (1 << 3);
+
+
+  //format |= (1 << 5);
   /* Write the register back to the IC */
   writeRegister(ADXL345_REG_DATA_FORMAT, format);
   
@@ -254,14 +256,8 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
   _range = range;
 }
 
-/**************************************************************************/
-/*!
-    @brief  Sets the g range for the accelerometer
-*/
-/**************************************************************************/
 range_t Adafruit_ADXL345_Unified::getRange(void)
 {
-  /* Read the data format register to preserve bits */
   return (range_t)(readRegister(ADXL345_REG_DATA_FORMAT) & 0b11);
 }
 
