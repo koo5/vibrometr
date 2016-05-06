@@ -55,22 +55,22 @@ bool DS1307RTC::set(time_t t)
 bool DS1307RTC::read(tmElements_t &tm)
 {
   uint8_t sec;
-  Serial.println(F("Wire.beginTransmission(DS1307_CTRL_ID);"));
+  Serial.print(F("Wire.beginTransmission(DS1307_CTRL_ID)..."));
   Wire.beginTransmission(DS1307_CTRL_ID);
-  Serial.println(F("write"));
+  Serial.print(F("write.."));
 #if ARDUINO >= 100  
   Wire.write((uint8_t)0x00); 
 #else
   Wire.send(0x00);
 #endif  
-  Serial.println(F("end"));
+  Serial.print(F("endTr..."));
   if (Wire.endTransmission() != 0) {
-    Serial.println(F("RTC not found"));
+    Serial.print(F("RTC not found"));
     exists = false;
     return false;
   }
   exists = true;
-  Serial.println(F("request"));
+  Serial.println(F("request..."));
   // request the 7 data fields   (secs, min, hr, dow, date, mth, yr)
   Wire.requestFrom(DS1307_CTRL_ID, tmNbrFields);
   if (Wire.available() < tmNbrFields) return false;

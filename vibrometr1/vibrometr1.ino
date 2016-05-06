@@ -312,7 +312,7 @@ void test_acc(Acc &acc)
     return;
 
 
-  const uint32_t nsamples = 128*10;//(ramsz/6L);
+  const uint32_t nsamples = /*128*10*/(ramsz/6L);
     
   displayAccDetails(acc);  
   displayDataRate(acc);
@@ -353,7 +353,9 @@ while(true)
   
   tmElements_t start, end;
   RTC.read(start);
+  Serial.println("1");  
   RTC.read(end);
+  Serial.println("2");
   //time_t st = makeTime(start);
   //time_t et = makeTime(end);
   
@@ -361,6 +363,9 @@ while(true)
   unsigned long s;
   byte status;
   int16_t xyz[3];
+  Serial.print(F("getting "));
+  Serial.print(nsamples);
+  Serial.println(F(" samples"));
   for(s = 0; s < nsamples; s++)
   {
 
@@ -487,7 +492,7 @@ void fft_out(const uint32_t nsamples )
     }
 
     Serial.print(F("noise:"));
-    for (char a = 0; a < 3; a++)
+    for (byte a = 0; a < 3; a++)
     {
       Serial.print((char)('X' + a)); Serial.print(maxs[a] - mins[a]); Serial.print("   ");
     }
@@ -564,9 +569,9 @@ Serial.println(F("twi acc.."));
   test_acc(acctwi);
 
 divider();
-  test_sd();
+//  test_sd();
 divider();
-  write_time();
+//  write_time();
 divider();
   delay(500);
 }
@@ -626,7 +631,7 @@ void sd_out(const uint32_t nsamples )
     return;
   }
 */
-
+/*
 
   SDClass sd;
   if (!sd.begin()) {
@@ -668,8 +673,8 @@ void sd_out(const uint32_t nsamples )
       }
   
 
-
-
+*/
+}
 
 
 void test_sd(void)
@@ -801,4 +806,4 @@ SPI.transfer(0); SPI.transfer(0); xyz[2]=0;
 
 
 */
- */
+ 
