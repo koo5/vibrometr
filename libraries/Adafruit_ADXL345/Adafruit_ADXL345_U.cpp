@@ -248,7 +248,10 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
   format |= (1 << 3);
 
 
-  //format |= (1 << 5);
+//invert ints
+  format |= (1 << 5);
+
+
   /* Write the register back to the IC */
   writeRegister(ADXL345_REG_DATA_FORMAT, format);
   
