@@ -248,7 +248,7 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
   format |= (1 << 3);
 
 
-//invert ints
+//invert ints (make them active low)
   format |= (1 << 5);
 
 
