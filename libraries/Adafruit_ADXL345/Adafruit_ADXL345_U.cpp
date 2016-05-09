@@ -87,7 +87,7 @@ uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
     reg |= 0x80; // read byte
     digitalWrite(_cs, LOW);
     SPI.transfer(reg);
-    uint8_t reply = SPI.transfer(0xFF);
+    uint8_t reply = SPI.transfer(0);
     digitalWrite(_cs, HIGH);
     return reply;
   }  

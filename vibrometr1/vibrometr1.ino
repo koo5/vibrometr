@@ -172,7 +172,11 @@ void setup(void)
   pinMode(cssd, 1);
   pinMode(csacc, 1);
 
-  SPI.setClockDivider(SPI_CLOCK_DIV4); // The maximum SPI clock speed is 5 MHz with 100 pF
+  digitalWrite(csram, 1);
+  digitalWrite(cssd, 1);
+  digitalWrite(csacc, 1);  
+  
+  SPI.setClockDivider(SPI_CLOCK_DIV128); // The maximum SPI clock speed is 5 MHz with 100 pF
   SPI.begin();//Transaction(sramspi);
 
   init_ram();
@@ -180,8 +184,10 @@ void setup(void)
   divider(); 
   
   Acc accspi = Acc(13, 12, 11, csacc);
+ 
   test_acc_spi(accspi);
-Serial.println(F("setup done"));  
+
+  Serial.println(F("setup done"));  
   
 }
 
@@ -197,7 +203,8 @@ void divider(void)
 void loop(void)
 {
   while(true)
-  {Serial.println((long)digitalRead(3));  
+  {
+    //Serial.println((long)digitalRead(3));  
     spi_read();
   }
 }
