@@ -20,14 +20,11 @@
     v1.0 - First release
 */
 /**************************************************************************/
-#if ARDUINO >= 100
  #include "Arduino.h"
-#else
- #include "WProgram.h"
-#endif
 
 #include <Wire.h>
 #include <limits.h>
+#include <SPI.h>
 
 #include "Adafruit_ADXL345_U.h"
 
@@ -37,11 +34,7 @@
 */
 /**************************************************************************/
 /*inline*/ uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
-  #if ARDUINO >= 100
   return Wire.read();
-  #else
-  return Wire.receive();
-  #endif
 }
 
 /**************************************************************************/
@@ -50,11 +43,7 @@
 */
 /**************************************************************************/
 /*inline*/ void Adafruit_ADXL345_Unified::i2cwrite(uint8_t x) {
-  #if ARDUINO >= 100
   Wire.write((uint8_t)x);
-  #else
-  Wire.send(x);
-  #endif
 }
 
 /**************************************************************************/
@@ -62,18 +51,6 @@
     @brief  Abstract away SPI receiver & transmitter
 */
 /**************************************************************************/
-static uint8_t spixfer(uint8_t clock, uint8_t miso, uint8_t mosi, uint8_t data) {
-  uint8_t reply = 0;
-  for (int i=7; i>=0; i--) {
-    reply <<= 1;
-    digitalWrite(clock, LOW);
-    digitalWrite(mosi, data & (1<<i));
-    digitalWrite(clock, HIGH);
-    if (digitalRead(miso)) 
-      reply |= 1;
-  }
-  return reply;
-}
 
 /**************************************************************************/
 /*!
@@ -88,8 +65,8 @@ void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
     Wire.endTransmission();
   } else {
     digitalWrite(_cs, LOW);
-    spixfer(_clk, _di, _do, reg);
-    spixfer(_clk, _di, _do, value);
+    SPI.transfer(reg);
+    SPI.transfer(value);
     digitalWrite(_cs, HIGH);
   }
 }
@@ -109,8 +86,8 @@ uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
   } else {
     reg |= 0x80; // read byte
     digitalWrite(_cs, LOW);
-    spixfer(_clk, _di, _do, reg);
-    uint8_t reply = spixfer(_clk, _di, _do, 0xFF);
+    SPI.transfer(reg);
+    uint8_t reply = SPI.transfer(0xFF);
     digitalWrite(_cs, HIGH);
     return reply;
   }  
@@ -131,8 +108,8 @@ int16_t Adafruit_ADXL345_Unified::read16(uint8_t reg) {
   } else {
     reg |= 0x80 | 0x40; // read byte | multibyte
     digitalWrite(_cs, LOW);
-    spixfer(_clk, _di, _do, reg);
-    uint16_t reply = spixfer(_clk, _di, _do, 0xFF)  | (spixfer(_clk, _di, _do, 0xFF) << 8);
+    SPI.transfer(reg);
+    uint16_t reply = SPI.transfer(0xFF)  | (SPI.transfer(0xFF) << 8);
     digitalWrite(_cs, HIGH);
     return reply;
   }    
