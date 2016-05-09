@@ -29,15 +29,6 @@ const uint32_t ramsz = 1024L*1024L;
 
 
 
-
-
-
-
-
-
-
-
-
 void init_ram(void)
 {
   
@@ -51,22 +42,6 @@ void init_ram(void)
 
   
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -96,7 +71,6 @@ bool init_acc_spi(Acc &acc)
     return false;
   }
   SPI.setClockDivider(SPI_CLOCK_DIV4); // The maximum SPI clock speed is 5 MHz with 100 pF
-maximum loading
   acc.setDataRate(ADXL345_DATARATE_3200_HZ);
   
   acc.setRange(ADXL345_RANGE_16_G);
@@ -106,7 +80,7 @@ maximum loading
 }
 
 
-void acc_flush(unsigned int count = 50)
+void acc_twi_flush(unsigned int count = 50)
 {
   for (int i = 0; i < count; i++)
   {
@@ -123,75 +97,26 @@ void acc_spi_flush(unsigned int count = 50)
 {
   for (int i = 0; i < count; i++)
   {
-    Wire.beginTransmission(ADXL345_ADDRESS);
-    Wire.write(ADXL345_REG_DATAX0);
-    Wire.endTransmission();
-    Wire.requestFrom(ADXL345_ADDRESS, 1);
-    Wire.read();
+    spi_read();
   }
 }
 
-
-void acc_spi_wait(void)
-{
-  while(true)
-  {
-    byte status;
-
-    Wire.beginTransmission(ADXL345_ADDRESS);
-    //Wire.write(ADXL345_REG_FIFO_STATUS);
-    Wire.write(ADXL345_REG_INT_SOURCE);
-    Wire.endTransmission();
-    Wire.requestFrom(ADXL345_ADDRESS, 1);
-
-    status = Wire.read();
-
-    /*byte entries;
-    entries = status & 0b111111;
-    if (entries != 0) 
-      break;
-      */
-    if (status & (1<<7)) break;
-    //Serial.println(F("waiting for samples.."));
-  }
-}
+bool done;
+long long unsigned int address = 0;
+long long unsigned int toread;
 
 
-void test_acc(Acc &acc)
-{
-  if (!init_acc(acc))
-    return;
+const unsigned int bufsiz = 6;
+unsigned int bufpos = 0;
+char buf[bufsiz];
 
+const byte RD = 1 << 7;
+const byte MB = 1 << 6;
 
-  const uint32_t nsamples = /*128*10*/(ramsz/6L);
-    
-  displayAccDetails(acc);  
-  displayDataRate(acc);
-  displayRange(acc);
-  Serial.println("");
+byte sample_size = 6;
 
+volatile bool do_read;
 
-  SPI.begin();
-
-
-
-
-  acc_flush();
-  // Enable measurements
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
-  acc_wait();
-  acc_flush();
-
-  digitalWrite(sram.cs_pin, LOW);
-  SPI.transfer(SRAM_WRITE);
-  //adresa
-  SPI.transfer(0);
-  SPI.transfer(0);
-  SPI.transfer(0);
-
-
-  attachInterrupt(digitalPinToInterrupt(2), rd, FALLING);  
-}
 
 
 void test_acc_spi(Acc &acc)
@@ -200,77 +125,29 @@ void test_acc_spi(Acc &acc)
     return;
 
   const uint32_t nsamples = /*128*10*/(ramsz/6L);
+  toread = nsamples * 6;
     
   displayAccDetails(acc);  
   displayDataRate(acc);
   displayRange(acc);
   Serial.println("");
 
-
-  SPI.begin();
-
-
   digitalWrite(sram.cs_pin, HIGH);
-
-  digitalWrite(csacc, LOW);
-  acc_spi_flush();
   digitalWrite(csacc, HIGH);
+
+  acc_spi_flush();
+  do_read = false;
+  done = false;
+  address = 0;
+  
+  attachInterrupt(digitalPinToInterrupt(3), spi_read, FALLING);  
   
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
-  acc_spi_wait();
-  
-  digitalWrite(csacc, LOW);
-  acc_spi_flush();
-
-  digitalWrite(sram.cs_pin, LOW);
-  SPI.transfer(SRAM_WRITE);
-  //adresa
-  SPI.transfer(0);
-  SPI.transfer(0);
-  SPI.transfer(0);
-
-
-  attachInterrupt(digitalPinToInterrupt(3), rd, FALLING);  
 }
 
-volatile bool do_read = false;
-
-void rd(void)
+void spi_read(void) 
 {
-  do_read = true;    
-}
-
-const unsigned int bufsiz = 128;
-unsigned int bufpos = 0;
-char[bufsiz] buf;
-
-const byte RD = 1 << 7;
-const byte MB = 1 << 6;
-
-byte sample_size = 6;
-
-void spi_loop(void) 
-{
-  if (do_read)
-  {
-    do_read = false;
-    digitalWrite(csacc, LOW);
-    SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
-
-    for (int a = 0; a < 6; a++)
-    {
-      buf[bufpos++] = SPI.transfer(0);
-    }
-
-    SPI.transfer(0); // FIFO_CTL zahodime
-   
-    byte status = SPI.transfer(0);
-    byte entries;
-    entries = status & 0b111111;
-    //Serial.println(entries);
-    if (entries > 30) 
-      Serial.println(F("overflow"));
-  }
+  do_read = true;
 }
 
 void setup(void) 
@@ -289,13 +166,9 @@ void setup(void)
 
   divider(); 
   
-  Acc acctwi = Acc(12345);
-  Serial.println(F("twi acc.."));
-  test_acc(acctwi);
-
   Acc accspi = Acc(13, 12, 11, csacc);
-
-
+  test_acc_spi(accspi);
+Serial.println(F("setup done"));  
   
 }
 
@@ -308,7 +181,65 @@ void divider(void)
 
 }
 
+void loop(void)
+{
+  while(true)
+  {
+    if(do_read)
+    {
+      do_read = false;
+     Serial.println(F("xxx"));
+ 
+   address += 6;
+  if (address == toread)
+  {
+   detachInterrupt(digitalPinToInterrupt(3));  
+   done = true;
+   Serial.println(F("done"));
+  }
+  if (!(address & 0b11111111))
+  {
+     Serial.println(F("."));
+  }
+    
+    
+    char buf[6] ;
 
+    digitalWrite(csacc, LOW);
+    SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
+
+    for (int a = 0; a < 6; a++)
+    {
+      buf[a] = SPI.transfer(0);
+    }
+
+    SPI.transfer(0); // FIFO_CTL zahodime
+   
+    byte status = SPI.transfer(0);
+    byte entries;
+    entries = status & 0b111111;
+    //Serial.println(entries);
+    if (entries > 30) 
+      Serial.println(F("overflow"));
+      
+  digitalWrite(csacc, HIGH);
+  digitalWrite(sram.cs_pin, LOW);
+  
+  SPI.transfer(SRAM_WRITE);
+  SPI.transfer((address >> 16) & 0xFF);
+  SPI.transfer((address >> 8)  & 0xFF);
+  SPI.transfer(address & 0xFF);
+
+  for (int a = 0; a < 6; a++)
+  {
+    SPI.transfer(buf[a]);
+  }
+
+  digitalWrite(sram.cs_pin, HIGH); 
+      }
+  }
+
+}
 
 
 /*
