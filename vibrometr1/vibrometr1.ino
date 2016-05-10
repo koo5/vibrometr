@@ -8,7 +8,7 @@
 
 
 const bool ticks_check = true;
-const bool serial_print = true;
+const bool serial_print = false;
 
 
 const byte cssd = 10;
@@ -21,6 +21,7 @@ const uint32_t ramsz = 1024L*1024L;
 SRAM sram(csram);
 
 tmElements_t tm;
+tmElements_t end_tm;
 
 
 
@@ -318,7 +319,7 @@ void test_acc_spi(Acc &acc)
 
   samplesize = 3*2;
   if (ticks_check) samplesize += 4;
-  nsamples = 10;//(ramsz/samplesize);
+  nsamples = /*10;//*/(ramsz/samplesize);
   toread = nsamples * samplesize;
 
     
@@ -342,6 +343,8 @@ void test_acc_spi(Acc &acc)
   address = 0;
   //Serial.println((long)digitalRead(3));  
   attachInterrupt(digitalPinToInterrupt(3), spi_int, FALLING);  
+  Serial.print(F("start: "));
+  Serial.println(now_string());
   Serial.println(F("sampling.."));
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
 
@@ -352,6 +355,14 @@ void test_acc_spi(Acc &acc)
   address = 0;
   while(!done) 
     spi_read();
+
+  if (!RTC.read(end_tm))
+  {
+    Serial.println(F("couldnt read rtc."));
+  }
+
+  Serial.print(F("end: "));
+  Serial.println(time_string(end_tm));
 
   detachInterrupt(digitalPinToInterrupt(3));
 
@@ -415,6 +426,7 @@ void setup(void)
   }
 
   sd_out();
+  test_sd();
   
   Serial.println(F("end"));  
   
@@ -449,13 +461,11 @@ void spi_read(void)
     dead = 0;
     do_read = false;
 
-/*
+
     if (!(address & 0b11111111))
     {
-     Serial.println(address );
+     Serial.print('.');
     }
-*/
-
 
       
       char buf[6];
@@ -498,16 +508,19 @@ void spi_read(void)
         SPI.transfer(((byte*)&cycles)[a]);
       }
     }
+    address += 6;
     for (int a = 0; a < 6; a++)
     {
       SPI.transfer(buf[a]);
     } 
+    
+    
     digitalWrite(sram.cs_pin, HIGH); 
     
     SPI.setDataMode(SPI_MODE3);
 
     
-    address += 6;
+    
     if (address == toread)
     {
      done = true;
@@ -521,13 +534,6 @@ void spi_read(void)
 void sd_out()
 {
 
-  if(!RTC.read(tm))
-  {
-    Serial.println(F("couldnt read rtc."));
-    return;
-  }
-
-
   SDClass sd;
   if (!sd.begin()) {
     Serial.println(F("SD err"));
@@ -535,7 +541,7 @@ void sd_out()
   }
 
 
-  String fn = fn_time_string(tm) + ".csv";
+  String fn = fn_time_string(end_tm) + ".csv";
    
   File file = sd.open(fn.c_str(), FILE_WRITE);
   if (!file) 
@@ -555,9 +561,12 @@ void sd_out()
     file.print(F("ticks,"));
   file.println(F("X,Y,Z"));
   
-  const unsigned int bufsiz = 12;
+  const unsigned int bufsiz = 256;
   unsigned int sib = bufsiz/samplesize;
   unsigned long address;
+
+  Serial.print(F("toread bytes:"));
+  Serial.println(toread);
 
   for(address = 0; address < toread; address += sib * samplesize)
   {
@@ -582,9 +591,7 @@ void sd_out()
     {
       Serial.print(F("address:"));
       Serial.print(address);
-      Serial.print(F(" toread:"));
-      Serial.print(toread);
-/*      Serial.print(F("sib * samplesize:"));
+      /*Serial.print(F("sib * samplesize:"));
       Serial.print(sib * samplesize);
   */    
       Serial.println(F(".."));
@@ -624,6 +631,9 @@ void sd_out()
      int16_t xyz[3];
      char i0,i1;
      int16_t v;
+
+     if(bufpos >= bufsiz)
+        Serial.print("err");
       
      for (int a = 0; a < 3; a++)
      {
@@ -632,9 +642,6 @@ void sd_out()
        v = i0 | (i1 << 8);
        xyz[a] = v;
      }
-
-     if(bufpos >= bufsiz)
-        Serial.print("err");
 
      file.print(xyz[0]);
      file.print(",");
@@ -651,11 +658,97 @@ void sd_out()
      }
     }
   }
-  
+  file.flush();
   sd.end();
   Serial.println(F("done writing."));
   
 }
+
+
+void test_sd(void)
+{
+  Sd2Card card;
+
+
+  Serial.print(F("\nInitializing SD card..."));
+
+  if (!card.init()) {
+    Serial.println(F("initialization failed. Things to check:"));
+    Serial.println(F("* is a card inserted?"));
+    Serial.println(F("* is your wiring correct?"));
+    Serial.println(F("* did you change the chipSelect pin to match your shield or module?"));
+    return;
+  } else {
+    Serial.println(F("Wiring is correct and a card is present."));
+  }
+
+  // print the type of card
+  Serial.print(F("\nCard type: "));
+  switch (card.type()) {
+    case SD_CARD_TYPE_SD1:
+      Serial.println(F("SD1"));
+      break;
+    case SD_CARD_TYPE_SD2:
+      Serial.println(F("SD2"));
+      break;
+    case SD_CARD_TYPE_SDHC:
+      Serial.println(F("SDHC"));
+      break;
+    default:
+      Serial.println(F("Unknown"));
+  }
+
+
+
+
+
+  SdVolume volume;
+
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!volume.init(card)) {
+    Serial.println(F("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card"));
+    return;
+  }
+
+
+  // print the type and size of the first FAT-type volume
+  uint32_t volumesize;
+  Serial.print(F("\nVolume type is FAT"));
+  Serial.println(volume.fatType(), DEC);
+  Serial.println();
+
+  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
+  volumesize *= 512;                            // SD card blocks are always 512 bytes
+  Serial.print(F("Volume size (bytes): "));
+  Serial.println(volumesize);
+  Serial.print(F("Volume size (Kbytes): "));
+  volumesize /= 1024;
+  Serial.println(volumesize);
+  Serial.print(F("Volume size (Mbytes): "));
+  volumesize /= 1024;
+  Serial.println(volumesize);
+
+
+
+  {
+  Serial.println(F("\nFiles found on the card (name, date and size in bytes): "));
+
+  SdFile root;
+
+
+  root.openRoot(volume);
+
+  // list all files in the card with date and size
+  root.ls(LS_DATE | LS_SIZE);
+
+  }
+
+}
+
+
+
+
 
 /*
  * > - uvidime jak rychle to pujde a pak jak dlouhy maximalni casovy usek s co nejrychlejsim vzorkovanim se vejde do pameti
