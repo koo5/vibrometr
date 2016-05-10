@@ -371,58 +371,58 @@ void displayDataRate(Acc &acc)
   switch(acc.getDataRate())
   {
     case ADXL345_DATARATE_3200_HZ:
-      Serial.print  ("3200 "); 
+      Serial.print  (F("3200 ")); 
       break;
     case ADXL345_DATARATE_1600_HZ:
-      Serial.print  ("1600 "); 
+      Serial.print  (F("1600 ")); 
       break;
     case ADXL345_DATARATE_800_HZ:
-      Serial.print  ("800 "); 
+      Serial.print  (F("800 ")); 
       break;
     case ADXL345_DATARATE_400_HZ:
-      Serial.print  ("400 "); 
+      Serial.print  (F("400 ")); 
       break;
     case ADXL345_DATARATE_200_HZ:
-      Serial.print  ("200 "); 
+      Serial.print  (F("200 ")); 
       break;
     case ADXL345_DATARATE_100_HZ:
-      Serial.print  ("100 "); 
+      Serial.print  (F("100 ")); 
       break;
     case ADXL345_DATARATE_50_HZ:
-      Serial.print  ("50 "); 
+      Serial.print  (F("50 ")); 
       break;
     case ADXL345_DATARATE_25_HZ:
-      Serial.print  ("25 "); 
+      Serial.print  (F("25 ")); 
       break;
     case ADXL345_DATARATE_12_5_HZ:
-      Serial.print  ("12.5 "); 
+      Serial.print  (F("12.5 ")); 
       break;
     case ADXL345_DATARATE_6_25HZ:
-      Serial.print  ("6.25 "); 
+      Serial.print  (F("6.25 ")); 
       break;
     case ADXL345_DATARATE_3_13_HZ:
-      Serial.print  ("3.13 "); 
+      Serial.print  (F("3.13 ")); 
       break;
     case ADXL345_DATARATE_1_56_HZ:
-      Serial.print  ("1.56 "); 
+      Serial.print  (F("1.56 ")); 
       break;
     case ADXL345_DATARATE_0_78_HZ:
-      Serial.print  ("0.78 "); 
+      Serial.print  (F("0.78 ")); 
       break;
     case ADXL345_DATARATE_0_39_HZ:
-      Serial.print  ("0.39 "); 
+      Serial.print  (F("0.39 ")); 
       break;
     case ADXL345_DATARATE_0_20_HZ:
-      Serial.print  ("0.20 "); 
+      Serial.print  (F("0.20 ")); 
       break;
     case ADXL345_DATARATE_0_10_HZ:
-      Serial.print  ("0.10 "); 
+      Serial.print  (F("0.10 ")); 
       break;
     default:
-      Serial.print  ("???? "); 
+      Serial.print  (F("???? ")); 
       break;
   }  
-  Serial.println(" Hz");  
+  Serial.println(F(" Hz"));  
 }
 
 void displayRange(Acc &acc)
@@ -432,20 +432,20 @@ void displayRange(Acc &acc)
   switch(acc.getRange())
   {
     case ADXL345_RANGE_16_G:
-      Serial.print  ("16 "); 
+      Serial.print  (F("16 ")); 
       break;
     case ADXL345_RANGE_8_G:
-      Serial.print  ("8 "); 
+      Serial.print  (F("8 ")); 
       break;
     case ADXL345_RANGE_4_G:
-      Serial.print  ("4 "); 
+      Serial.print  (F("4 ")); 
       break;
     case ADXL345_RANGE_2_G:
-      Serial.print  ("2 "); 
+      Serial.print  (F("2 ")); 
       break;
     default:
-      Serial.print  ("?? "); 
+      Serial.print  (F("?? ")); 
       break;
   }  
-  Serial.println(" g");  
+  Serial.println(F(" g"));  
 }
