@@ -46,17 +46,58 @@
   Wire.write((uint8_t)x);
 }
 
+
 /**************************************************************************/
 /*!
     @brief  Abstract away SPI receiver & transmitter
 */
 /**************************************************************************/
 
-/**************************************************************************/
-/*!
-    @brief  Writes 8-bits to the specified destination register
+/*
+static uint8_t spixfer(uint8_t clock, uint8_t miso, uint8_t mosi, uint8_t data) {
+  uint8_t reply = 0;
+  for (int i=7; i>=0; i--) {
+    reply <<= 1;
+    digitalWrite(clock, LOW);
+    digitalWrite(mosi, data & (1<<i));
+    digitalWrite(clock, HIGH);
+    if (digitalRead(miso)) 
+      reply |= 1;
+  }
+  return reply;
+}
+
+void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
+  if (_i2c) {
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    i2cwrite((uint8_t)reg);
+    i2cwrite((uint8_t)(value));
+    Wire.endTransmission();
+  } else {
+    digitalWrite(_cs, LOW);
+    spixfer(_clk, _di, _do, reg);
+    spixfer(_clk, _di, _do, value);
+    digitalWrite(_cs, HIGH);
+  }
+}
+
+uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
+  if (_i2c) {
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    i2cwrite(reg);
+    Wire.endTransmission();
+    Wire.requestFrom(ADXL345_ADDRESS, 1);
+    return (i2cread());
+  } else {
+    reg |= 0x80; // read byte
+    digitalWrite(_cs, LOW);
+    spixfer(_clk, _di, _do, reg);
+    uint8_t reply = spixfer(_clk, _di, _do, 0xFF);
+    digitalWrite(_cs, HIGH);
+    return reply;
+  }  
+}
 */
-/**************************************************************************/
 void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
   if (_i2c) {
     Wire.beginTransmission(ADXL345_ADDRESS);
@@ -71,11 +112,6 @@ void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
   }
 }
 
-/**************************************************************************/
-/*!
-    @brief  Reads 8-bits from the specified register
-*/
-/**************************************************************************/
 uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
   if (_i2c) {
     Wire.beginTransmission(ADXL345_ADDRESS);
