@@ -6,35 +6,144 @@
 #include <DS1307RTC.h>
 #include "SRAM.h"
 
-
+/*true/false*/
 const bool ticks_check = false;
-const bool serial_print = false;
+const bool serial_print = 0;
+
 const dataRate_t datarate = ADXL345_DATARATE_3200_HZ;
 
-byte samplesize ;
-uint32_t nsamples = 100;
+uint32_t nsamples = 0;
 
 const byte cssd = 10;
 const byte csacc = 9;
 const byte csram = 8;
 
-
 const uint32_t ramsz = 1024L*1024L;
 
-SRAM sram(csram);
 
-tmElements_t tm;
+
+
+
+SRAM sram(csram);
 tmElements_t end_tm;
+byte samplesize ;
+
+
+
+
+
+
+
+
+
+
+int I2C_ClearBus() {
+/**
+ * This routine turns off the I2C bus and clears it
+ * on return SCA and SCL pins are tri-state inputs.
+ * You need to call Wire.begin() after this to re-enable I2C
+ * This routine does NOT use the Wire library at all.
+ *
+ * returns 0 if bus cleared
+ *         1 if SCL held low.
+ *         2 if SDA held low by slave clock stretch for > 2sec
+ *         3 if SDA held low after 20 clocks.
+ */
+ 
+#if defined(TWCR) && defined(TWEN)
+  TWCR &= ~(_BV(TWEN)); //Disable the Atmel 2-Wire interface so we can control the SDA and SCL pins directly
+#endif
+
+  pinMode(SDA, INPUT_PULLUP); // Make SDA (data) and SCL (clock) pins Inputs with pullup.
+  pinMode(SCL, INPUT_PULLUP);
+
+//  delay(2500);  // Wait 2.5 secs. This is strictly only necessary on the first power
+  // up of the DS3231 module to allow it to initialize properly,
+  // but is also assists in reliable programming of FioV3 boards as it gives the
+  // IDE a chance to start uploaded the program
+  // before existing sketch confuses the IDE by sending Serial data.
+
+  boolean SCL_LOW = (digitalRead(SCL) == LOW); // Check is SCL is Low.
+  if (SCL_LOW) { //If it is held low Arduno cannot become the I2C master. 
+    return 1; //I2C bus error. Could not clear SCL clock line held low
+  }
+
+  boolean SDA_LOW = (digitalRead(SDA) == LOW);  // vi. Check SDA input.
+  int clockCount = 20; // > 2x9 clock
+
+  while (SDA_LOW && (clockCount > 0)) { //  vii. If SDA is Low,
+    clockCount--;
+  // Note: I2C bus is open collector so do NOT drive SCL or SDA high.
+    pinMode(SCL, INPUT); // release SCL pullup so that when made output it will be LOW
+    pinMode(SCL, OUTPUT); // then clock SCL Low
+    delayMicroseconds(10); //  for >5uS
+    pinMode(SCL, INPUT); // release SCL LOW
+    pinMode(SCL, INPUT_PULLUP); // turn on pullup resistors again
+    // do not force high as slave may be holding it low for clock stretching.
+    delayMicroseconds(10); //  for >5uS
+    // The >5uS is so that even the slowest I2C devices are handled.
+    SCL_LOW = (digitalRead(SCL) == LOW); // Check if SCL is Low.
+    int counter = 20;
+    while (SCL_LOW && (counter > 0)) {  //  loop waiting for SCL to become High only wait 2sec.
+      counter--;
+      delay(100);
+      SCL_LOW = (digitalRead(SCL) == LOW);
+    }
+    if (SCL_LOW) { // still low after 2 sec error
+      return 2; // I2C bus error. Could not clear. SCL clock line held low by slave clock stretch for >2sec
+    }
+    SDA_LOW = (digitalRead(SDA) == LOW); //   and check SDA input again and loop
+  }
+  if (SDA_LOW) { // still low
+    return 3; // I2C bus error. Could not clear. SDA data line held low
+  }
+
+  // else pull SDA line low for Start or Repeated Start
+  pinMode(SDA, INPUT); // remove pullup.
+  pinMode(SDA, OUTPUT);  // and then make it LOW i.e. send an I2C Start or Repeated start control.
+  // When there is only one I2C master a Start or Repeat Start has the same function as a Stop and clears the bus.
+  /// A Repeat Start is a Start occurring after a Start with no intervening Stop.
+  delayMicroseconds(10); // wait >5uS
+  pinMode(SDA, INPUT); // remove output low
+  pinMode(SDA, INPUT_PULLUP); // and make SDA high i.e. send I2C STOP control.
+  delayMicroseconds(10); // x. wait >5uS
+  pinMode(SDA, INPUT); // and reset pins as tri-state inputs which is the default state on reset
+  pinMode(SCL, INPUT);
+  return 0; // all ok
+}
+
+
+void clear_i2c() {
+  
+  int rtn = I2C_ClearBus(); // clear the I2C bus first before calling Wire.begin()
+  if (rtn != 0) {
+    Serial.println(F("I2C bus error. Could not clear"));
+    if (rtn == 1) {
+      Serial.println(F("SCL clock line held low"));
+    } else if (rtn == 2) {
+      Serial.println(F("SCL clock line held low by slave clock stretch"));
+    } else if (rtn == 3) {
+      Serial.println(F("SDA data line held low"));
+    }
+  } 
+  else
+  { 
+    Serial.println(F("i2c bus clear"));
+    // re-enable Wire
+    // now can start Wire Arduino master
+    Wire.begin();
+  }
+}
 
 
 
 
 void rtc_auto_set(void)
 {
-
+  tmElements_t tm;
 
   // get the date and time the compiler was run
-  if (getDate(__DATE__) && getTime(__TIME__))
+  if (getDate(tm, __DATE__) && getTime(tm, __TIME__))
   {
     if (RTC.write(tm))
     {
@@ -59,7 +168,7 @@ void rtc_auto_set(void)
   }
 }
 
-bool getTime(const char *str)
+bool getTime(tmElements_t &tm, const char *str)
 {
   int Hour, Min, Sec;
 
@@ -74,7 +183,7 @@ bool getTime(const char *str)
   return true;
 }
 
-bool getDate(const char *str)
+bool getDate(tmElements_t & tm, const char *str)
 {
   String monthName = F("JanFebMarAprMayJunJulAugSepOctNovDec");
   char Month[12];
@@ -164,13 +273,6 @@ void test_rtc() {
 }
 
 
-
-
-
-
-
-
-
 void init_ram(void)
 {
   
@@ -248,6 +350,43 @@ bool init_acc_twi(Acc &acc)
   return true;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**************************************************************************/
+
+
+
+
+
+
+
+
+
 bool init_acc_spi(Acc &acc)
 {
   if(!acc.begin())
@@ -318,11 +457,6 @@ void test_acc_spi(Acc &acc)
   if (!init_acc_spi(acc))
     return;
 
-  samplesize = 3*2;
-  if (ticks_check) samplesize += 4;
-  nsamples = nsamples ? nsamples : (ramsz/samplesize);
-  toread = nsamples * samplesize;
-
     
   displayAccDetails(acc);  
   displayDataRate(acc);
@@ -357,14 +491,6 @@ void test_acc_spi(Acc &acc)
   while(!done) 
     spi_read();
 
-  if (!RTC.read(end_tm))
-  {
-    Serial.println(F("couldnt read rtc."));
-  }
-
-  Serial.print(F("end: "));
-  Serial.println(time_string(end_tm));
-
   detachInterrupt(digitalPinToInterrupt(3));
 
   SPI.setDataMode(SPI_MODE0);  
@@ -392,6 +518,11 @@ void spi_int(void)
 
 void setup(void) 
 {
+  Serial.begin(115200);
+ 
+  clear_i2c();
+  test_rtc();
+  
   if(ticks_check)
   {
     noInterrupts();
@@ -402,8 +533,6 @@ void setup(void)
     interrupts();
   }
       
-  Serial.begin(115200);
-  
   digitalWrite(csram, 1);
   digitalWrite(cssd, 1);
   digitalWrite(csacc, 1);  
@@ -423,17 +552,26 @@ void setup(void)
 
   divider(); 
 
-  {
+
+  samplesize = 3*2;
+  if (ticks_check) samplesize += 4;
+  nsamples = nsamples ? nsamples : (ramsz/samplesize);
+  toread = nsamples * samplesize;
+
+
   Acc accspi = Acc(13, 12, 11, csacc);
- 
   test_acc_spi(accspi);
-  }
-  Serial.println(F("sd_out:"));
+  if (!RTC.read(end_tm))   {    Serial.println(F("couldnt read rtc."));   }
+  Serial.print(F("end: "));   Serial.println(time_string(end_tm));
+
+
+  //test_sd_speed();
   sd_out();
   test_sd();
   
+
   Serial.println(F("end"));  
-  
+
 }
 
 void divider(void)
@@ -458,6 +596,9 @@ void spi_read(void)
     dead++;
     if (dead > 1000)
       Serial.println(F("dead"));
+      /*nezvladali jsme dost rychle cist a clearovat interrupt flag, takze 
+       * uz nedostavame interrupt pri novem samplu
+       */
     return;
   }
     
@@ -535,13 +676,32 @@ void spi_read(void)
 }
 
 
+void w_timing_end(time_t w_start_time)
+{
+  tmElements_t w_end_tm;
+  RTC.read(w_end_tm);
+  Serial.print(F("done writing in "));
+  Serial.print(makeTime(w_end_tm) - w_start_time);
+  //http://pastebin.com/sfEjA94n
+  Serial.println(F(" seconds."));  
+}
 
-#define nl  {if(serial_print)Serial.println(""); file.println("");}
-#define out(x) {if(serial_print)Serial.print(x); file.print(x);}
+
+
+#define ifsp(x)
+//#define ifsp(x) if(serial_print) {x}
+#define nl  {ifsp(Serial.println("");) file.print('\n');}
+#define out(x) {ifsp(Serial.print(x);) file.print(x);}
 
 void sd_out()
 {
-  test_sd();
+
+
+  tmElements_t w_start_tm, w_end_tm;
+  RTC.read(w_start_tm);
+  time_t w_start_time = makeTime(w_start_tm);
+
+  
   Serial.print(F("ok..")); 
   SDClass sd;
   Serial.print(F("ok..")); 
@@ -550,6 +710,7 @@ void sd_out()
     return;
   }
   Serial.print(F("ok..")); 
+
   
   String fn = fn_time_string(end_tm) + ".csv";
   Serial.print(F("filename:")); 
@@ -563,22 +724,22 @@ void sd_out()
     return;
   }
 
-  Serial.println(F("writing...")); 
- 
-  out(time_string(tm));
-  nl;
-  out(F("nsamples:")); out(nsamples);
-  out(F("datarate:")); out(datarate);
-  nl;
-  
-  const unsigned int bufsiz = 256;
-  unsigned int sib = bufsiz/samplesize;
-  unsigned long address;
-
   Serial.print(F("toread bytes:"));
   Serial.println(toread);
+  Serial.println(F("writing...")); 
+ 
+  out(time_string(end_tm));
+  nl;
+  out(F("nsamples:")); out(nsamples);
+  out(F(" datarate:")); out(datarate);
+  nl;
+  
+  const unsigned int bufsiz = 156;
+  unsigned int sib = (bufsiz/samplesize)&~1;
+  unsigned long address;
+  const unsigned int bufused = sib * samplesize;
 
-  for(address = 0; address < toread; address += sib * samplesize)
+  for(address = 0; address + bufused < toread; address += bufused)
   {
   
     digitalWrite(sram.cs_pin, LOW);
@@ -598,14 +759,21 @@ void sd_out()
     digitalWrite(sram.cs_pin, HIGH);
 
 
-    if(!serial_print)
+    //if(!serial_print)
     {
-      Serial.print(F("address:"));
-      Serial.print(address);
-      /*Serial.print(F("sib * samplesize:"));
-      Serial.print(sib * samplesize);
-  */    
-      Serial.println(F(".."));
+      static byte x = 0;
+      if (!(x++ & 0b1111))
+      {
+        Serial.print(F("address:"));
+        Serial.print(address);
+        /*Serial.print(F("sib * samplesize:"));
+        Serial.print(sib * samplesize);*/    
+        Serial.print(F(".."));
+  
+        RTC.read(w_end_tm);
+        Serial.print(address / (makeTime(w_end_tm) - w_start_time));
+        Serial.println(F(" samplebytes/second"));  
+      }
     }
 
     unsigned int bufpos = 0;
@@ -622,7 +790,8 @@ void sd_out()
       Serial.print(bufpos);
       Serial.println(F(".."));
 */
-      
+
+      /*
      if (ticks_check)
      {
        
@@ -635,34 +804,50 @@ void sd_out()
        out(cycles);
        out(",");
      
-     }
+     }*/
 
      int16_t xyz[3];
      char i0,i1;
      int16_t v;
 
-     if(bufpos >= bufsiz)
-        Serial.print("err");
+     /*if(bufpos >= bufsiz)
+        Serial.print("err");*/
       
-     for (int a = 0; a < 3; a++)
+     /*for (int a = 0; a < 3; a++)
      {
        i0 = buf[bufpos++];
        i1 = buf[bufpos++];
        v = i0 | (i1 << 8);
        xyz[a] = v;
+     }*/
+
+     for (int a = 0; a < 6; a++)
+     {
+       ((byte*) xyz)[a] = buf[bufpos++];
      }
 
-     out(xyz[0]);
+    /* out(xyz[0]);
      out(",");
      out(xyz[1]);
      out(",");
-     out(xyz[2]);
-     nl;
+     out(xyz[2]);*/
+     /*out("xyz[0]");
+     out(',');
+     out("xyz[1]");
+     out(',');
+     out("xyz[2]" );
+     nl;*/
+     char buffer[50];
+     sprintf(buffer, "%d,%d,%d\n", xyz[0],xyz[1],xyz[2]);
+     out(buffer);
     }
   }
   file.flush();
   sd.end();
-  Serial.println(F("done writing."));
+
+
+  w_timing_end(w_start_time);
+
   
 }
 
@@ -748,6 +933,45 @@ void test_sd(void)
 
 }
 
+
+void test_sd_speed()
+{
+
+  tmElements_t w_start_tm, w_end_tm;
+  RTC.read(w_start_tm);
+  time_t w_start_time = makeTime(w_start_tm);
+  
+  Serial.print(F("test sd speed..")); 
+  SDClass sd;
+  Serial.print(F("ok..")); 
+  if (!sd.begin()) {
+    Serial.println(F("SD err"));
+    return;
+  }
+  Serial.print(F("ok..")); 
+  
+  String fn = "test";
+  Serial.print(F("filename:")); 
+  Serial.println(fn);
+   
+  File file = sd.open(fn.c_str(), FILE_WRITE);
+  if (!file) 
+  {
+    Serial.print(F("error opening "));
+    Serial.println(fn);
+    return;
+  }
+
+  Serial.println(F("writing...")); 
+
+  for(unsigned long x = 0; x < 2100000 / 3; x++)
+    file.print("tes");
+
+  file.flush();
+  sd.end();
+
+  w_timing_end(w_start_time);
+}
 
 
 
