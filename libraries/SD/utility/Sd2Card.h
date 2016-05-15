@@ -174,7 +174,7 @@ class Sd2Card {
    * select pin.  See sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin).
    */
   uint8_t init(void) {
-    return init(SPI_FULL_SPEED, SD_CHIP_SELECT_PIN);
+    return init(SPI_HALF_SPEED, SD_CHIP_SELECT_PIN);
   }
   /**
    * Initialize an SD flash memory card with the selected SPI clock rate

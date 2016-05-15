@@ -7,9 +7,12 @@
 #include "SRAM.h"
 
 
-const bool ticks_check = true;
+const bool ticks_check = false;
 const bool serial_print = false;
+const dataRate_t datarate = ADXL345_DATARATE_3200_HZ;
 
+byte samplesize ;
+uint32_t nsamples = 100;
 
 const byte cssd = 10;
 const byte csacc = 9;
@@ -253,7 +256,7 @@ bool init_acc_spi(Acc &acc)
     return false;
   }
 
-  acc.setDataRate(ADXL345_DATARATE_3200_HZ);
+  acc.setDataRate(datarate);
   
   acc.setRange(ADXL345_RANGE_16_G);
   acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream mode
@@ -309,8 +312,6 @@ void acc_spi_flush(unsigned int count = 50)
 }
 
 
-byte samplesize ;
-uint32_t nsamples ;
 
 void test_acc_spi(Acc &acc)
 {
@@ -319,7 +320,7 @@ void test_acc_spi(Acc &acc)
 
   samplesize = 3*2;
   if (ticks_check) samplesize += 4;
-  nsamples = /*10;//*/(ramsz/samplesize);
+  nsamples = nsamples ? nsamples : (ramsz/samplesize);
   toread = nsamples * samplesize;
 
     
@@ -391,13 +392,16 @@ void spi_int(void)
 
 void setup(void) 
 {
-  noInterrupts();
-  TIMSK0 = 0;
-  TIMSK1 = 0;
-  TCCR1A = 0;
-  TCCR1B = 1;
-  interrupts();
-    
+  if(ticks_check)
+  {
+    noInterrupts();
+    TIMSK0 = 0;
+    TIMSK1 = 0;
+    TCCR1A = 0;
+    TCCR1B = 1;
+    interrupts();
+  }
+      
   Serial.begin(115200);
   
   digitalWrite(csram, 1);
@@ -424,7 +428,7 @@ void setup(void)
  
   test_acc_spi(accspi);
   }
-
+  Serial.println(F("sd_out:"));
   sd_out();
   test_sd();
   
@@ -531,17 +535,25 @@ void spi_read(void)
 }
 
 
+
+#define nl  {if(serial_print)Serial.println(""); file.println("");}
+#define out(x) {if(serial_print)Serial.print(x); file.print(x);}
+
 void sd_out()
 {
-
+  test_sd();
+  Serial.print(F("ok..")); 
   SDClass sd;
+  Serial.print(F("ok..")); 
   if (!sd.begin()) {
     Serial.println(F("SD err"));
     return;
   }
-
-
+  Serial.print(F("ok..")); 
+  
   String fn = fn_time_string(end_tm) + ".csv";
+  Serial.print(F("filename:")); 
+  Serial.println(fn);
    
   File file = sd.open(fn.c_str(), FILE_WRITE);
   if (!file) 
@@ -551,15 +563,13 @@ void sd_out()
     return;
   }
 
-  Serial.print(F("writing "));
-   Serial.println(fn);
+  Serial.println(F("writing...")); 
  
-  file.print(F("#"));
-  file.print(time_string(tm));
-  file.println("");
-  if (ticks_check)
-    file.print(F("ticks,"));
-  file.println(F("X,Y,Z"));
+  out(time_string(tm));
+  nl;
+  out(F("nsamples:")); out(nsamples);
+  out(F("datarate:")); out(datarate);
+  nl;
   
   const unsigned int bufsiz = 256;
   unsigned int sib = bufsiz/samplesize;
@@ -579,6 +589,7 @@ void sd_out()
 
     char buf[bufsiz];
     unsigned int b;
+
     for (b = 0; b < sib * samplesize; b++)
     {
       buf[b] = SPI.transfer(0);
@@ -598,10 +609,10 @@ void sd_out()
     }
 
     unsigned int bufpos = 0;
-
     unsigned int s;
     for (s = 0; s < sib; s++)
     {
+
 /*
       Serial.print(F("sib:"));
       Serial.print(sib);
@@ -614,18 +625,16 @@ void sd_out()
       
      if (ticks_check)
      {
-      unsigned long cycles;
-      for (int a = 0; a < 4; a++)
-      {
-        ((byte*)&cycles)[a] = buf[bufpos++];
-      }
-      file.print(cycles);
-      file.print(",");
-      if(serial_print)
-      {
-        Serial.print(cycles);
-        Serial.print(",");
-      }
+       
+       unsigned long cycles;
+       for (int a = 0; a < 4; a++)
+       {
+         ((byte*)&cycles)[a] = buf[bufpos++];
+       }
+     
+       out(cycles);
+       out(",");
+     
      }
 
      int16_t xyz[3];
@@ -643,19 +652,12 @@ void sd_out()
        xyz[a] = v;
      }
 
-     file.print(xyz[0]);
-     file.print(",");
-     file.print(xyz[1]);
-     file.print(",");
-     file.println(xyz[2]);
-     if(serial_print)
-     {
-      Serial.print(xyz[0]);
-      Serial.print(",");
-      Serial.print(xyz[1]);
-      Serial.print(",");
-      Serial.println(xyz[2]);
-     }
+     out(xyz[0]);
+     out(",");
+     out(xyz[1]);
+     out(",");
+     out(xyz[2]);
+     nl;
     }
   }
   file.flush();
