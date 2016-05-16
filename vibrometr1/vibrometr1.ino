@@ -8,7 +8,7 @@
 
 /*true/false*/
 const bool ticks_check = false;
-const bool serial_print = 0;
+const bool serial_print = 1;
 
 const dataRate_t datarate = ADXL345_DATARATE_3200_HZ;
 
@@ -555,7 +555,7 @@ void setup(void)
 
   samplesize = 3*2;
   if (ticks_check) samplesize += 4;
-  nsamples = nsamples ? nsamples : (ramsz/samplesize);
+  nsamples = (nsamples ? nsamples : (ramsz/samplesize))&~1;
   toread = nsamples * samplesize;
 
 
@@ -778,7 +778,7 @@ void sd_out()
 
     unsigned int bufpos = 0;
     unsigned int s;
-    for (s = 0; s < sib; s++)
+    for (s = 0; s < sib; s+=2)
     {
 
 /*
@@ -806,7 +806,7 @@ void sd_out()
      
      }*/
 
-     int16_t xyz[3];
+     int16_t xyz[6];
      char i0,i1;
      int16_t v;
 
@@ -821,7 +821,7 @@ void sd_out()
        xyz[a] = v;
      }*/
 
-     for (int a = 0; a < 6; a++)
+     for (int a = 0; a < 12; a++)
      {
        ((byte*) xyz)[a] = buf[bufpos++];
      }
@@ -837,8 +837,8 @@ void sd_out()
      out(',');
      out("xyz[2]" );
      nl;*/
-     char buffer[50];
-     sprintf(buffer, "%d,%d,%d\n", xyz[0],xyz[1],xyz[2]);
+     char buffer[1+6*(1+5+1)];
+     sprintf(buffer, "%d,%d,%d\n%d,%d,%d\n", xyz[0],xyz[1],xyz[2],xyz[3],xyz[4],xyz[5]);
      out(buffer);
     }
   }
