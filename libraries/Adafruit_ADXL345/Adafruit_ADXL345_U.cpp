@@ -235,7 +235,7 @@ bool Adafruit_ADXL345_Unified::begin() {
   uint8_t deviceid = getDeviceID();
   if (deviceid != 0xE5)
   {
-    Serial.print(F("No ADXL345 detected ... deviceid:"));
+    Serial.print(F("not detected ... deviceid:"));
     Serial.println(deviceid, HEX);
     return false;
   }
@@ -261,7 +261,7 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
   format |= (1 << 3);
 
 
-//invert ints (make them active low)
+//invert interrupts (make them active low)
   format |= (1 << 5);
 
 
@@ -345,11 +345,13 @@ void displayAccDetails(Acc &acc)
   sensor_t sensor;
   acc.getSensor(&sensor);
   Serial.print  (F("Sensor:       ")); Serial.println(sensor.name);
-  Serial.print  (F("Driver Ver:   ")); Serial.println(sensor.version);
-  Serial.print  (F("Unique ID:    ")); Serial.println(sensor.sensor_id);
   Serial.print  (F("Max Value:    ")); Serial.print(sensor.max_value); Serial.println(F(" m/s^2"));
   Serial.print  (F("Min Value:    ")); Serial.print(sensor.min_value); Serial.println(F(" m/s^2"));
   Serial.print  (F("Resolution:   ")); Serial.print(sensor.resolution); Serial.println(F(" m/s^2"));
+  displayDataRate(acc);
+  displayRange(acc);
+  Serial.println("");
+
 }
 
 /*
