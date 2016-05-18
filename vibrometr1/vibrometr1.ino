@@ -6,13 +6,15 @@
 #include <DS1307RTC.h>
 #include "SRAM.h"
 
+/*konfigurace*/
+
 /*true/false*/
 const bool ticks_check = false;
 const bool serial_print = 1;
 
-const dataRate_t datarate = ADXL345_DATARATE_3200_HZ;
+const dataRate_t datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
 
-uint32_t nsamples = 0;
+uint32_t nsamples = 0;//0=max
 
 const byte cssd = 10;
 const byte csacc = 9;
@@ -20,16 +22,11 @@ const byte csram = 8;
 
 const uint32_t ramsz = 1024L*1024L;
 
-
-
-
+/*interni*/
 
 SRAM sram(csram);
 tmElements_t end_tm;
 byte samplesize ;
-
-
-
 
 
 
@@ -134,6 +131,16 @@ void clear_i2c() {
     Wire.begin();
   }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -273,6 +280,18 @@ void test_rtc() {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 void init_ram(void)
 {
   
@@ -292,11 +311,7 @@ void test_ram() {
   {
      Serial.print(address);
      Serial.print(":");
-/*
-Mode  Clock Polarity (CPOL) Clock Phase (CPHA)
-SPI_MODE0 0 0
-SPI_MODE1 0 1
-*/
+
     digitalWrite(sram.cs_pin, LOW);
     SPI.transfer(SRAM_WRITE);
     SPI.transfer((address >> 16) & 0xFF);
@@ -334,6 +349,20 @@ SPI_MODE1 0 1
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 bool init_acc_twi(Acc &acc)
 {
   if(!acc.begin())
@@ -349,6 +378,22 @@ bool init_acc_twi(Acc &acc)
   acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b10000000);//DATA_READY (na INT1)
   return true;
 }
+*/
+
+
+/*
+void acc_twi_flush(unsigned int count = 50)
+{
+  for (int i = 0; i < count; i++)
+  {
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    Wire.write(ADXL345_REG_DATAX0);
+    Wire.endTransmission();
+    Wire.requestFrom(ADXL345_ADDRESS, 1);
+    Wire.read();
+  }
+}
+*/
 
 
 
@@ -389,11 +434,17 @@ bool init_acc_twi(Acc &acc)
 
 bool init_acc_spi(Acc &acc)
 {
+
+
+  SPI.setClockDivider(SPI_CLOCK_DIV4);
+  SPI.setDataMode(SPI_MODE3);
+  
   if(!acc.begin())
   {
     Serial.println(F("not detected"));
     return false;
   }
+
 
   acc.setDataRate(datarate);
   
@@ -402,22 +453,6 @@ bool init_acc_spi(Acc &acc)
   acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b10000000);//DATA_READY (na INT1)
   return true;
 }
-
-
-void acc_twi_flush(unsigned int count = 50)
-{
-  for (int i = 0; i < count; i++)
-  {
-    Wire.beginTransmission(ADXL345_ADDRESS);
-    Wire.write(ADXL345_REG_DATAX0);
-    Wire.endTransmission();
-    Wire.requestFrom(ADXL345_ADDRESS, 1);
-    Wire.read();
-  }
-}
-
-
-
 
 
 bool done;
@@ -457,6 +492,19 @@ void test_acc_spi(Acc &acc)
   if (!init_acc_spi(acc))
     return;
 
+
+  
+  if(ticks_check)
+  {
+    noInterrupts();
+    TIMSK0 = 0;
+    TIMSK1 = 0;
+    TCCR1A = 0;
+    TCCR1B = 1;
+    interrupts();
+  }
+  
+
     
   displayAccDetails(acc);  
   displayDataRate(acc);
@@ -466,6 +514,11 @@ void test_acc_spi(Acc &acc)
   
   digitalWrite(sram.cs_pin, HIGH);
   digitalWrite(csacc, HIGH);
+
+
+  SPI.setClockDivider(SPI_CLOCK_DIV4); 
+  SPI.setDataMode(SPI_MODE3);
+
 
 
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
@@ -516,63 +569,7 @@ void spi_int(void)
   old_ticks = ticks;
 }
 
-void setup(void) 
-{
-  Serial.begin(115200);
- 
-  clear_i2c();
-  test_rtc();
-  
-  if(ticks_check)
-  {
-    noInterrupts();
-    TIMSK0 = 0;
-    TIMSK1 = 0;
-    TCCR1A = 0;
-    TCCR1B = 1;
-    interrupts();
-  }
-      
-  digitalWrite(csram, 1);
-  digitalWrite(cssd, 1);
-  digitalWrite(csacc, 1);  
-  
-  pinMode(csram, 1);
-  pinMode(cssd, 1);
-  pinMode(csacc, 1);
- 
-  SPI.begin();
-  SPI.setClockDivider(SPI_CLOCK_DIV2); // The maximum SPI clock speed is 5 MHz with 100 pF
 
-  init_ram();
-  //test_ram();
-  
-  SPI.setClockDivider(SPI_CLOCK_DIV4); 
-  SPI.setDataMode(SPI_MODE3);
-
-  divider(); 
-
-
-  samplesize = 3*2;
-  if (ticks_check) samplesize += 4;
-  nsamples = (nsamples ? nsamples : (ramsz/samplesize))&~1;
-  toread = nsamples * samplesize;
-
-
-  Acc accspi = Acc(13, 12, 11, csacc);
-  test_acc_spi(accspi);
-  if (!RTC.read(end_tm))   {    Serial.println(F("couldnt read rtc."));   }
-  Serial.print(F("end: "));   Serial.println(time_string(end_tm));
-
-
-  //test_sd_speed();
-  sd_out();
-  test_sd();
-  
-
-  Serial.println(F("end"));  
-
-}
 
 void divider(void)
 {
@@ -594,7 +591,7 @@ void spi_read(void)
   if(!do_read)
   {
     dead++;
-    if (dead > 1000)
+    if (dead > 10000)
       Serial.println(F("dead"));
       /*nezvladali jsme dost rychle cist a clearovat interrupt flag, takze 
        * uz nedostavame interrupt pri novem samplu
@@ -614,8 +611,11 @@ void spi_read(void)
 
       
       char buf[6];
+
       digitalWrite(csacc, LOW);
       SPI.setClockDivider(SPI_CLOCK_DIV4); 
+      SPI.setDataMode(SPI_MODE3);
+
       SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
       for (int a = 0; a < 6; a++)
       {
@@ -662,9 +662,7 @@ void spi_read(void)
     
     digitalWrite(sram.cs_pin, HIGH); 
     
-    SPI.setDataMode(SPI_MODE3);
-
-    
+  
     
     if (address == toread)
     {
@@ -688,8 +686,8 @@ void w_timing_end(time_t w_start_time)
 
 
 
-#define ifsp(x)
-//#define ifsp(x) if(serial_print) {x}
+//#define ifsp(x)
+#define ifsp(x) if(serial_print) {x}
 #define nl  {ifsp(Serial.println("");) file.print('\n');}
 #define out(x) {ifsp(Serial.print(x);) file.print(x);}
 
@@ -839,6 +837,7 @@ void sd_out()
      nl;*/
      char buffer[1+6*(1+5+1)];
      sprintf(buffer, "%d,%d,%d\n%d,%d,%d\n", xyz[0],xyz[1],xyz[2],xyz[3],xyz[4],xyz[5]);
+     /*zapisovani po dvou usetri jen asi 5s*/
      out(buffer);
     }
   }
@@ -850,6 +849,54 @@ void sd_out()
 
   
 }
+
+
+
+
+
+
+
+
+
+
+void dbg_simple_ram_read()
+{
+  Serial.print(F("nsamples:")); Serial.println(nsamples);
+
+  unsigned long address = 0;
+  digitalWrite(sram.cs_pin, LOW);
+  SPI.transfer(SRAM_READ);
+  SPI.transfer((address >> 16) & 0xFF);
+  SPI.transfer((address >> 8)  & 0xFF);
+  SPI.transfer(address & 0xFF);
+
+  for(address = 0; address < toread / 6; address += 6)
+  {
+  
+    char buf[6];
+    unsigned int b;
+
+    for (b = 0; b < 6; b++)
+    {
+      buf[b] = SPI.transfer(0);
+    }
+
+    int16_t* xyz = (int16_t*)buf;
+    char buffer[1+6*(1+5+1)];
+    sprintf(buffer, "%d,%d,%d\n", xyz[0],xyz[1],xyz[2]);
+    Serial.println(buffer);
+   
+  }
+  
+  digitalWrite(sram.cs_pin, HIGH);
+  
+}
+
+
+
+
+
+
 
 
 void test_sd(void)
@@ -934,6 +981,57 @@ void test_sd(void)
 }
 
 
+
+
+void list_files(void)
+{
+  Sd2Card card;
+  if (!card.init()) {
+    Serial.println(F("initialization failed. Things to check:"));
+    return;
+  }
+  
+  SdVolume volume;
+
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!volume.init(card)) {
+    Serial.println(F("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card"));
+    return;
+  }
+
+
+  // print the type and size of the first FAT-type volume
+  uint32_t volumesize;
+  Serial.print(F("\nVolume type is FAT"));
+  Serial.println(volume.fatType(), DEC);
+  Serial.println();
+
+  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
+  volumesize *= 512;                            // SD card blocks are always 512 bytes
+  Serial.print(F("Volume size (bytes): "));
+  Serial.println(volumesize);
+  Serial.print(F("Volume size (Kbytes): "));
+  volumesize /= 1024;
+  Serial.println(volumesize);
+  Serial.print(F("Volume size (Mbytes): "));
+  volumesize /= 1024;
+  Serial.println(volumesize);
+
+
+
+  Serial.println(F("\nFiles found on the card (name, date and size in bytes): "));
+
+  SdFile root;
+  root.openRoot(volume);
+
+  // list all files in the card with date and size
+  root.ls(LS_DATE | LS_SIZE);
+}
+
+
+
+
 void test_sd_speed()
 {
 
@@ -992,4 +1090,200 @@ void test_sd_speed()
 
 
 */
- /*todo reset i2c po resetu arduina?*/
+
+
+
+
+void setup(void) 
+{
+  Serial.begin(115200);
+  divider();divider();
+  Serial.println(F("init..."));
+   
+  clear_i2c();
+  test_rtc();//init
+  
+  digitalWrite(csram, 1);
+  digitalWrite(cssd, 1);
+  digitalWrite(csacc, 1);  
+  
+  pinMode(csram, 1);
+  pinMode(cssd, 1);
+  pinMode(csacc, 1);
+ 
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV2); // The maximum SPI clock speed is 5 MHz with 100 pF (ADXL)
+
+  init_ram();
+
+
+  divider(); 
+
+
+  samplesize = 3*2;
+  if (ticks_check) samplesize += 4;
+  nsamples = (nsamples ? nsamples : (ramsz/samplesize))&~1;
+  toread = nsamples * samplesize;
+
+
+  menu();
+}
+
+
+
+
+void write_time(void)
+{
+  SDClass sd;
+  Serial.println(F("write time.txt..."));
+  if (sd.begin()) {
+    File file = sd.open("time.txt", FILE_WRITE);
+    if (! file) 
+      Serial.println(F("error opening time.txt"));
+    file.println(now_string());
+    file.flush();
+    sd.end();
+  }
+  else
+    Serial.println(F("err"));
+    
+  SPI.end();
+}
+
+
+
+
+
+
+
+bool init_acc(Acc &acc)
+{
+  Serial.println(F("init acc.."));
+  
+  /* Initialise the sensor */
+  if(!acc.begin())
+  {
+    Serial.println(F("not detected"));
+    return false;
+  }
+  acc.setRange(ADXL345_RANGE_16_G); //16 8 4 2
+  return true;
+}
+
+void test_acc(Acc &acc)
+{
+  if (!init_acc(acc))
+    return;
+
+  if (acc._i2c)
+    acc.setDataRate(ADXL345_DATARATE_800_HZ);
+  else
+    acc.setDataRate(ADXL345_DATARATE_3200_HZ);
+  
+  
+  displayAccDetails(acc);  
+  displayDataRate(acc);
+  displayRange(acc);
+  Serial.println("");
+
+  
+  long x;
+  for(x = 0; x < 100; x++)
+  {
+    sensors_event_t event; 
+    acc.getEvent(&event);
+ 
+    Serial.print(F("X: ")); Serial.print(event.acceleration.x);
+    Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
+    Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
+  }
+  
+}
+
+
+
+
+
+
+
+
+void test_accs()
+{
+  SPI.setClockDivider(SPI_CLOCK_DIV4);
+  SPI.setDataMode(SPI_MODE3);
+  Acc accspi = Acc(13, 12, 11, csacc);
+  Serial.println(F("spi acc.."));
+    test_acc(accspi);
+  
+  Wire.setClock(400000L);
+  Acc acctwi = Acc(12345);
+  Serial.println(F("twi acc.."));
+    test_acc(acctwi);
+}
+
+
+
+
+
+
+void m_spi_acquire()
+{
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV4);
+  SPI.setDataMode(SPI_MODE3);
+
+  Acc accspi = Acc(13, 12, 11, csacc);
+  test_acc_spi(accspi);
+  
+  if (!RTC.read(end_tm))   {    Serial.println(F("couldnt read rtc."));   }
+  Serial.print(F("end: "));   Serial.println(time_string(end_tm));
+
+  sd_out();
+  list_files();
+}
+
+
+
+
+
+
+void m_self_test()
+{
+divider();  
+
+  test_rtc();
+divider();  
+
+  test_ram();
+divider();  
+
+  test_sd();
+divider();  
+
+  test_sd_speed();
+divider();  
+
+  write_time();
+divider();  
+
+  test_accs();
+divider();  
+
+Serial.println(F("selftest done"));
+}
+
+
+void menu()
+{
+ while(true)
+ {
+  Serial.println(F("menu"));  
+  
+  m_self_test();
+  
+  m_spi_acquire();
+    
+ }
+}
+
+
