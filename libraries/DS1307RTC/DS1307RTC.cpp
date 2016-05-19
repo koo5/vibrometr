@@ -24,6 +24,7 @@
 
 #include <Wire.h>
 #include "DS1307RTC.h"
+#include "Arduino.h"
 
 #define DS1307_CTRL_ID 0x68 
 
@@ -61,11 +62,11 @@ bool DS1307RTC::read(tmElements_t &tm)
   Wire.send(0x00);
 #endif  
   if (Wire.endTransmission() != 0) {
+    Serial.print(F("RTC not found"));
     exists = false;
     return false;
   }
   exists = true;
-
   // request the 7 data fields   (secs, min, hr, dow, date, mth, yr)
   Wire.requestFrom(DS1307_CTRL_ID, tmNbrFields);
   if (Wire.available() < tmNbrFields) return false;

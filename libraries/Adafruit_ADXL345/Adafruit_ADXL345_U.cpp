@@ -20,14 +20,11 @@
     v1.0 - First release
 */
 /**************************************************************************/
-#if ARDUINO >= 100
  #include "Arduino.h"
-#else
- #include "WProgram.h"
-#endif
 
 #include <Wire.h>
 #include <limits.h>
+#include <SPI.h>
 
 #include "Adafruit_ADXL345_U.h"
 
@@ -36,12 +33,8 @@
     @brief  Abstract away platform differences in Arduino wire library
 */
 /**************************************************************************/
-inline uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
-  #if ARDUINO >= 100
+/*inline*/ uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
   return Wire.read();
-  #else
-  return Wire.receive();
-  #endif
 }
 
 /**************************************************************************/
@@ -49,19 +42,18 @@ inline uint8_t Adafruit_ADXL345_Unified::i2cread(void) {
     @brief  Abstract away platform differences in Arduino wire library
 */
 /**************************************************************************/
-inline void Adafruit_ADXL345_Unified::i2cwrite(uint8_t x) {
-  #if ARDUINO >= 100
+/*inline*/ void Adafruit_ADXL345_Unified::i2cwrite(uint8_t x) {
   Wire.write((uint8_t)x);
-  #else
-  Wire.send(x);
-  #endif
 }
+
 
 /**************************************************************************/
 /*!
     @brief  Abstract away SPI receiver & transmitter
 */
 /**************************************************************************/
+
+/*
 static uint8_t spixfer(uint8_t clock, uint8_t miso, uint8_t mosi, uint8_t data) {
   uint8_t reply = 0;
   for (int i=7; i>=0; i--) {
@@ -75,11 +67,6 @@ static uint8_t spixfer(uint8_t clock, uint8_t miso, uint8_t mosi, uint8_t data) 
   return reply;
 }
 
-/**************************************************************************/
-/*!
-    @brief  Writes 8-bits to the specified destination register
-*/
-/**************************************************************************/
 void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
   if (_i2c) {
     Wire.beginTransmission(ADXL345_ADDRESS);
@@ -94,11 +81,6 @@ void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
   }
 }
 
-/**************************************************************************/
-/*!
-    @brief  Reads 8-bits from the specified register
-*/
-/**************************************************************************/
 uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
   if (_i2c) {
     Wire.beginTransmission(ADXL345_ADDRESS);
@@ -111,6 +93,37 @@ uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
     digitalWrite(_cs, LOW);
     spixfer(_clk, _di, _do, reg);
     uint8_t reply = spixfer(_clk, _di, _do, 0xFF);
+    digitalWrite(_cs, HIGH);
+    return reply;
+  }  
+}
+*/
+void Adafruit_ADXL345_Unified::writeRegister(uint8_t reg, uint8_t value) {
+  if (_i2c) {
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    i2cwrite((uint8_t)reg);
+    i2cwrite((uint8_t)(value));
+    Wire.endTransmission();
+  } else {
+    digitalWrite(_cs, LOW);
+    SPI.transfer(reg);
+    SPI.transfer(value);
+    digitalWrite(_cs, HIGH);
+  }
+}
+
+uint8_t Adafruit_ADXL345_Unified::readRegister(uint8_t reg) {
+  if (_i2c) {
+    Wire.beginTransmission(ADXL345_ADDRESS);
+    i2cwrite(reg);
+    Wire.endTransmission();
+    Wire.requestFrom(ADXL345_ADDRESS, 1);
+    return (i2cread());
+  } else {
+    reg |= 0x80; // read byte
+    digitalWrite(_cs, LOW);
+    SPI.transfer(reg);
+    uint8_t reply = SPI.transfer(0);
     digitalWrite(_cs, HIGH);
     return reply;
   }  
@@ -131,8 +144,8 @@ int16_t Adafruit_ADXL345_Unified::read16(uint8_t reg) {
   } else {
     reg |= 0x80 | 0x40; // read byte | multibyte
     digitalWrite(_cs, LOW);
-    spixfer(_clk, _di, _do, reg);
-    uint16_t reply = spixfer(_clk, _di, _do, 0xFF)  | (spixfer(_clk, _di, _do, 0xFF) << 8);
+    SPI.transfer(reg);
+    uint16_t reply = SPI.transfer(0xFF)  | (SPI.transfer(0xFF) << 8);
     digitalWrite(_cs, HIGH);
     return reply;
   }    
@@ -222,13 +235,10 @@ bool Adafruit_ADXL345_Unified::begin() {
   uint8_t deviceid = getDeviceID();
   if (deviceid != 0xE5)
   {
-    Serial.print(F("No ADXL345 detected ... deviceid:"));
+    Serial.print(F("not detected ... deviceid:"));
     Serial.println(deviceid, HEX);
     return false;
   }
-  
-  // Enable measurements
-  writeRegister(ADXL345_REG_POWER_CTL, 0x08);  
     
   return true;
 }
@@ -240,16 +250,21 @@ bool Adafruit_ADXL345_Unified::begin() {
 /**************************************************************************/
 void Adafruit_ADXL345_Unified::setRange(range_t range)
 {
-  /* Red the data format register to preserve bits */
-  uint8_t format = readRegister(ADXL345_REG_DATA_FORMAT);
+  /* Read the data format register to preserve bits */
+  uint8_t format = getRange();
 
   /* Update the data rate */
-  format &= ~0x0F;
+  format &= ~0x0F; //clear full_res, justify and range
   format |= range;
   
-  /* Make sure that the FULL-RES bit is enabled for range scaling */
-  format |= 0x08;
-  
+  /* FULL-RES enable  */
+  format |= (1 << 3);
+
+
+//invert interrupts (make them active low)
+  format |= (1 << 5);
+
+
   /* Write the register back to the IC */
   writeRegister(ADXL345_REG_DATA_FORMAT, format);
   
@@ -257,15 +272,9 @@ void Adafruit_ADXL345_Unified::setRange(range_t range)
   _range = range;
 }
 
-/**************************************************************************/
-/*!
-    @brief  Sets the g range for the accelerometer
-*/
-/**************************************************************************/
 range_t Adafruit_ADXL345_Unified::getRange(void)
 {
-  /* Red the data format register to preserve bits */
-  return (range_t)(readRegister(ADXL345_REG_DATA_FORMAT) & 0x03);
+  return (range_t)(readRegister(ADXL345_REG_DATA_FORMAT) & 0b11);
 }
 
 /**************************************************************************/
@@ -329,4 +338,116 @@ void Adafruit_ADXL345_Unified::getSensor(sensor_t *sensor) {
   sensor->max_value   = -156.9064F; /* -16g = 156.9064 m/s^2  */
   sensor->min_value   = 156.9064F;  /*  16g = 156.9064 m/s^2  */
   sensor->resolution  = 0.03923F;   /*  4mg = 0.0392266 m/s^2 */ 
+}
+
+void displayAccDetails(Acc &acc)
+{
+  sensor_t sensor;
+  acc.getSensor(&sensor);
+  Serial.println(sensor.name);
+  Serial.print  (F("Max: ")); Serial.print(sensor.max_value); Serial.println(F(" m/s^2"));
+  Serial.print  (F("Min: ")); Serial.print(sensor.min_value); Serial.println(F(" m/s^2"));
+  Serial.print  (F("Res: ")); Serial.print(sensor.resolution); Serial.println(F(" m/s^2"));
+  displayDataRate(acc);
+  displayRange(acc);
+  Serial.println("");
+
+}
+
+/*
+#include <avr/pgmspace.h>
+
+void displayDataRate(Acc &acc)
+{
+  Serial.print  (F("Rate:")); 
+  Serial.println(s[15-acc.getDataRate()]);
+ 
+  static const char s0[] PROGMEM  = 
+*/
+
+
+void displayDataRate(Acc &acc)
+{
+  Serial.print  (F("Rate:")); 
+  
+  switch(acc.getDataRate())
+  {
+    case ADXL345_DATARATE_3200_HZ:
+      Serial.print  (F("3200 ")); 
+      break;
+    case ADXL345_DATARATE_1600_HZ:
+      Serial.print  (F("1600 ")); 
+      break;
+    case ADXL345_DATARATE_800_HZ:
+      Serial.print  (F("800 ")); 
+      break;
+    case ADXL345_DATARATE_400_HZ:
+      Serial.print  (F("400 ")); 
+      break;
+    case ADXL345_DATARATE_200_HZ:
+      Serial.print  (F("200 ")); 
+      break;
+    case ADXL345_DATARATE_100_HZ:
+      Serial.print  (F("100 ")); 
+      break;
+    case ADXL345_DATARATE_50_HZ:
+      Serial.print  (F("50 ")); 
+      break;
+    case ADXL345_DATARATE_25_HZ:
+      Serial.print  (F("25 ")); 
+      break;
+    case ADXL345_DATARATE_12_5_HZ:
+      Serial.print  (F("12.5 ")); 
+      break;
+    case ADXL345_DATARATE_6_25HZ:
+      Serial.print  (F("6.25 ")); 
+      break;
+    case ADXL345_DATARATE_3_13_HZ:
+      Serial.print  (F("3.13 ")); 
+      break;
+    case ADXL345_DATARATE_1_56_HZ:
+      Serial.print  (F("1.56 ")); 
+      break;
+    case ADXL345_DATARATE_0_78_HZ:
+      Serial.print  (F("0.78 ")); 
+      break;
+    case ADXL345_DATARATE_0_39_HZ:
+      Serial.print  (F("0.39 ")); 
+      break;
+    case ADXL345_DATARATE_0_20_HZ:
+      Serial.print  (F("0.20 ")); 
+      break;
+    case ADXL345_DATARATE_0_10_HZ:
+      Serial.print  (F("0.10 ")); 
+      break;
+    default:
+      Serial.print  (F("???? ")); 
+      break;
+  }  
+  Serial.println(F(" Hz"));  
+}
+
+void displayRange(Acc &acc)
+{
+  Serial.print  (F("Range: +/- ")); 
+  
+  switch(acc.getRange())
+  {
+    case ADXL345_RANGE_16_G:
+      Serial.print  (F("16 ")); 
+      break;
+    case ADXL345_RANGE_8_G:
+      Serial.print  (F("8 ")); 
+      break;
+    case ADXL345_RANGE_4_G:
+      Serial.print  (F("4 ")); 
+      break;
+    case ADXL345_RANGE_2_G:
+      Serial.print  (F("2 ")); 
+      break;
+    default:
+      Serial.print  (F("?? ")); 
+      break;
+  }  
+  Serial.println(F(" g"));  
 }
