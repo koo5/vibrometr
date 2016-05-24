@@ -340,114 +340,37 @@ void Adafruit_ADXL345_Unified::getSensor(sensor_t *sensor) {
   sensor->resolution  = 0.03923F;   /*  4mg = 0.0392266 m/s^2 */ 
 }
 
+HZ dataRate2hz(dataRate_t dataRate)
+{
+	return 320000/(1L<<(15-dataRate));
+}
+
+String hz_str(HZ hz)
+{
+  return String(hz) + String(F("/100Hz"));
+}
+
+String range_str(range_t r)
+{
+  return String(2 * (r+1)) + String("g");
+}
+
 void displayAccDetails(Acc &acc)
 {
   sensor_t sensor;
   acc.getSensor(&sensor);
   Serial.println(sensor.name);
+  /*
   Serial.print  (F("Max: ")); Serial.print(sensor.max_value); Serial.println(F(" m/s^2"));
   Serial.print  (F("Min: ")); Serial.print(sensor.min_value); Serial.println(F(" m/s^2"));
   Serial.print  (F("Res: ")); Serial.print(sensor.resolution); Serial.println(F(" m/s^2"));
-  displayDataRate(acc);
-  displayRange(acc);
+  */
+  Serial.print  (F("Range: +/- ")); Serial.println(range_str(acc.getRange()));
+  Serial.print  (F("Rate:"));       Serial.println(hz_str(dataRate2hz(acc.getDataRate())));
   Serial.println("");
-
 }
+
 
 /*
 #include <avr/pgmspace.h>
-
-void displayDataRate(Acc &acc)
-{
-  Serial.print  (F("Rate:")); 
-  Serial.println(s[15-acc.getDataRate()]);
- 
-  static const char s0[] PROGMEM  = 
 */
-
-
-void displayDataRate(Acc &acc)
-{
-  Serial.print  (F("Rate:")); 
-  
-  switch(acc.getDataRate())
-  {
-    case ADXL345_DATARATE_3200_HZ:
-      Serial.print  (F("3200 ")); 
-      break;
-    case ADXL345_DATARATE_1600_HZ:
-      Serial.print  (F("1600 ")); 
-      break;
-    case ADXL345_DATARATE_800_HZ:
-      Serial.print  (F("800 ")); 
-      break;
-    case ADXL345_DATARATE_400_HZ:
-      Serial.print  (F("400 ")); 
-      break;
-    case ADXL345_DATARATE_200_HZ:
-      Serial.print  (F("200 ")); 
-      break;
-    case ADXL345_DATARATE_100_HZ:
-      Serial.print  (F("100 ")); 
-      break;
-    case ADXL345_DATARATE_50_HZ:
-      Serial.print  (F("50 ")); 
-      break;
-    case ADXL345_DATARATE_25_HZ:
-      Serial.print  (F("25 ")); 
-      break;
-    case ADXL345_DATARATE_12_5_HZ:
-      Serial.print  (F("12.5 ")); 
-      break;
-    case ADXL345_DATARATE_6_25HZ:
-      Serial.print  (F("6.25 ")); 
-      break;
-    case ADXL345_DATARATE_3_13_HZ:
-      Serial.print  (F("3.13 ")); 
-      break;
-    case ADXL345_DATARATE_1_56_HZ:
-      Serial.print  (F("1.56 ")); 
-      break;
-    case ADXL345_DATARATE_0_78_HZ:
-      Serial.print  (F("0.78 ")); 
-      break;
-    case ADXL345_DATARATE_0_39_HZ:
-      Serial.print  (F("0.39 ")); 
-      break;
-    case ADXL345_DATARATE_0_20_HZ:
-      Serial.print  (F("0.20 ")); 
-      break;
-    case ADXL345_DATARATE_0_10_HZ:
-      Serial.print  (F("0.10 ")); 
-      break;
-    default:
-      Serial.print  (F("???? ")); 
-      break;
-  }  
-  Serial.println(F(" Hz"));  
-}
-
-void displayRange(Acc &acc)
-{
-  Serial.print  (F("Range: +/- ")); 
-  
-  switch(acc.getRange())
-  {
-    case ADXL345_RANGE_16_G:
-      Serial.print  (F("16 ")); 
-      break;
-    case ADXL345_RANGE_8_G:
-      Serial.print  (F("8 ")); 
-      break;
-    case ADXL345_RANGE_4_G:
-      Serial.print  (F("4 ")); 
-      break;
-    case ADXL345_RANGE_2_G:
-      Serial.print  (F("2 ")); 
-      break;
-    default:
-      Serial.print  (F("?? ")); 
-      break;
-  }  
-  Serial.println(F(" g"));  
-}

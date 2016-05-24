@@ -6,15 +6,23 @@
 #include <DS1307RTC.h>
 #include "SRAM.h"
 
+#define SPRINTF sprintf
+
 /*konfigurace*/
 
 /*true/false*/
 const bool ticks_check = false;
 const bool serial_print = 1;
 
-const dataRate_t datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
+dataRate_t conf_datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
 
-uint32_t nsamples = 0;//0=max
+
+/*
+In [5]: (1024**2)/8/6/3200
+Out[5]: 6.826666666666666*/
+unsigned int conf_duration = 6;
+
+//uint32_t conf_nsamples = 0;//0=10s
 
 const byte cssd = 10;
 const byte csacc = 9;
@@ -28,6 +36,34 @@ SRAM sram(csram);
 tmElements_t end_tm;
 byte samplesize ;
 long dead;
+long unsigned toread; //bytes
+dataRate_t datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
+uint32_t nsamples = 6;
+
+
+void reconf()
+{
+  datarate = conf_datarate;
+  
+  samplesize = 3*2;
+  if (ticks_check) samplesize += 4;
+  //nsamples = (nsamples ? nsamples : (ramsz/samplesize));
+
+
+  unsigned int hz = 3200/(16-datarate);
+  
+  nsamples = conf_duration * hz;
+ 
+  if (ramsz/samplesize < nsamples)
+  {
+    Serial.println(F("error: not enough ram"));
+    nsamples = ramsz/samplesize;
+  }
+
+  nsamples &= ~1;
+  
+  toread = nsamples * samplesize;
+}
 
 
 
@@ -158,7 +194,7 @@ void clear_i2c() {
 
 
 
-void rtc_auto_set(void)
+bool rtc_auto_set(void)
 {
   tmElements_t tm;
 
@@ -167,11 +203,12 @@ void rtc_auto_set(void)
   {
     if (RTC.write(tm))
     {
-      Serial.print(F("time set."));
+      Serial.println(F("time set."));
       /*Serial.print(F("DS1307 configured Time="));
       Serial.print(__TIME__);
       Serial.print(F(", Date="));
       Serial.println(F(__DATE__));*/
+      return true;
     }
     else
     {
@@ -187,6 +224,7 @@ void rtc_auto_set(void)
     Serial.print(F(__DATE__));
     Serial.println("\"");*/
   }
+  return false;
 }
 
 bool getTime(tmElements_t &tm, const char *str)
@@ -226,7 +264,7 @@ bool getDate(tmElements_t & tm, const char *str)
   }
   if (monthIndex >= 12)
   {
-    Serial.println(F("error"));
+    Serial.println(F("err14"));
     return false;
   }
   tm.Day = Day;
@@ -240,19 +278,29 @@ String now_string(void)
 {
   tmElements_t tm;
 
-  if (!RTC.read(tm))
+  if (RTC.read(tm))
+    return time_string(tm);
+  else
   {
-    Serial.println(F("rtc err"));
-    return String("");
+    if (RTC.chipPresent())
+    {
+      Serial.println(F("RTC stopped. setting time..."));
+      if(rtc_auto_set())
+        return now_string();
+    }
+    else
+    {
+      String r = String(F("RTCerror"));
+      Serial.println(r);//!  Please check the circuitry.
+    }
   }
-
-  return time_string(tm);
+  
 }
 
 String time_string(tmElements_t &tm)
 {
   char t[40];
-  sprintf(t, "%04d/%02d/%02d %02d:%02d:%02d",
+  SPRINTF(t, "%04d/%02d/%02d %02d:%02d:%02d",
     tmYearToCalendar(tm.Year),
     tm.Month,
     tm.Day,
@@ -265,7 +313,7 @@ String time_string(tmElements_t &tm)
 String fn_time_string(tmElements_t &tm)
 {
   char t[40];
-  sprintf(t, "%02d%02d%02d%02d",
+  SPRINTF(t, "%02d%02d%02d%02d",
     tm.Day,
     tm.Hour,
     tm.Minute,
@@ -276,26 +324,13 @@ String fn_time_string(tmElements_t &tm)
 
 void test_rtc() {
   Serial.println(F("DS1307RTC Test"));
-  init_rtc();
+  for (byte i = 0; i < 10; i++)
+  {
+    Serial.println(now_string());
+    delay(1000);
+  }
 }
 
-void init_rtc()
-{
-  String t = now_string();
-  if (t == "")
-  {
-    if (RTC.chipPresent())
-    {
-      Serial.println(F("stopped. setting time..."));
-      rtc_auto_set();
-     }
-     else
-     {
-      Serial.println(F("err"));//!  Please check the circuitry.
-    }
-  }
-  Serial.println(t);
-}
 
 
 
@@ -312,7 +347,7 @@ void init_rtc()
 
 void init_ram(void)
 {
-  SPI.setClockDivider(SPI_CLOCK_DIV2); 
+//  SPI.setClockDivider(SPI_CLOCK_DIV2); 
   digitalWrite(sram.cs_pin, LOW);
   SPI.transfer(SRAM_WRSR);
   SPI.transfer(sram.mode);
@@ -330,15 +365,17 @@ void sram_start(byte mode, unsigned long address)
 
 void test_ram() 
 {
-  uint32_t address = 0;
-  
+  SPI.setClockDivider(SPI_CLOCK_DIV2); 
   Serial.println(F("sram test:"));
+ 
+  uint32_t address = 0;
+  uint32_t fails = 0;
+ 
+  sram_start(SRAM_WRITE, address);
 
-      
-      sram_start(SRAM_WRITE, address);
-      uint32_t d;
-      for(d = 0; d < ramsz/4; d++)
-      {
+  uint32_t d;
+  for(d = 0; d < ramsz/4; d++)
+  {
         uint32_t b = d;
 
 
@@ -362,14 +399,14 @@ void test_ram()
         SPI.transfer(d2);
         SPI.transfer(d3);
         SPI.transfer(d4);
-      }
-      digitalWrite(sram.cs_pin, HIGH);
+  }
+  digitalWrite(sram.cs_pin, HIGH);
 
-      Serial.print("..");
+  Serial.print("..");
 
-      sram_start(SRAM_READ, address);
-      for(d = 0; d < ramsz/4; d++)
-      {
+  sram_start(SRAM_READ, address);
+  for(d = 0; d < ramsz/4; d++)
+  {
         uint32_t data;
         uint32_t expt = d;
 
@@ -387,7 +424,7 @@ void test_ram()
         Serial.print((long)d3);
         Serial.print("  ");
         Serial.println((long)d4);
-    */    
+  */    
           data = (uint32_t)d1
           | ((uint32_t)d2 << 8)
           | ((uint32_t)d3 << 16)
@@ -398,10 +435,11 @@ void test_ram()
           Serial.print(data);
           Serial.print("!=");
           Serial.println(expt);
+          if (fails++ > 10) break;
         }
-      }
-      digitalWrite(sram.cs_pin, HIGH);
-      Serial.println(F("done"));
+  }
+  digitalWrite(sram.cs_pin, HIGH);
+  Serial.println(F("done"));
 
 }
 
@@ -539,69 +577,86 @@ void acc_twi_flush(unsigned int count = 50)
 
 
 
+/*testovaci jednoduzsi pomale cteni*/
 
+
+void simple_read_loop(Acc &acc, unsigned long count, bool p=true)
+{
+  long x;
+  for(x = 0; x < nsamples; x++)
+  {
+    sensors_event_t event; 
+    acc.getEvent(&event);
+    if(p)
+    {
+      Serial.print(F("X: ")); Serial.print(event.acceleration.x);
+      Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
+      Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
+    }
+  }
+}
 
 bool init_acc(Acc &acc)
 {
-  Serial.println(F("init acc.."));
+
+  if (!acc._i2c)
+  {
+    SPI.setClockDivider(SPI_CLOCK_DIV4);
+    SPI.setDataMode(SPI_MODE3);
+    datarate = ADXL345_DATARATE_3200_HZ;
+  }
+  else
+  {
+    Wire.setClock(400000L);
+    datarate = ADXL345_DATARATE_800_HZ;
+  }
   
-  /* Initialise the sensor */
   if(!acc.begin())
   {
-    Serial.println(F("not detected"));
     return false;
   }
+
   acc.setRange(ADXL345_RANGE_16_G); //16 8 4 2
+  acc.setDataRate(datarate);
 
-  
-  if (acc._i2c)
-    acc.setDataRate(ADXL345_DATARATE_800_HZ);
-  else
-    acc.setDataRate(ADXL345_DATARATE_3200_HZ);
-
+  acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream mode
+  acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b10000000);//DATA_READY (na INT1)
 
   return true;
 }
 
-void test_accs()
+void test_acc_spi()
 {
-  SPI.setClockDivider(SPI_CLOCK_DIV4);
-  SPI.setDataMode(SPI_MODE3);
   Acc accspi = Acc(13, 12, 11, csacc);
   Serial.println(F("spi acc.."));
-    test_acc(accspi);
-  
-  Wire.setClock(400000L);
+  test_acc(accspi);
+}
+
+void test_acc_twi()
+{
   Acc acctwi = Acc(12345);
   Serial.println(F("\ntwi acc.."));
-    test_acc(acctwi);
+  test_acc(acctwi);
+}
+
+void test_accs()
+{
+  test_acc_spi();  
+  test_acc_twi();
 }
 
 void test_acc(Acc &acc)
 {
+  reconf();
+  
   if (!init_acc(acc))
     return;
   
-  displayAccDetails(acc);  
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
 
-  simple_read_loop(acc);
-}
+  simple_read_loop(acc, 10 * datarate);
 
-void simple_read_loop(Acc &acc)
-{
-
-  long x;
-  for(x = 0; x < 100; x++)
-  {
-    sensors_event_t event; 
-    acc.getEvent(&event);
- 
-    Serial.print(F("X: ")); Serial.print(event.acceleration.x);
-    Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
-    Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
-  }
-  
+  displayAccDetails(acc); 
 }
 
 
@@ -618,25 +673,18 @@ void simple_read_loop(Acc &acc)
 
 
 
-bool init_acc_spi(Acc &acc)
-{
 
 
-  SPI.setClockDivider(SPI_CLOCK_DIV4);
-  SPI.setDataMode(SPI_MODE3);
-
-  
-  if(!acc.begin())
-  {
-    Serial.println(F("not detected"));
-    return false;
-  }
 
 
-  acc.setDataRate(datarate);
-  acc.setRange(ADXL345_RANGE_16_G);
-  acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream mode
-  acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b10000000);//DATA_READY (na INT1)
+
+
+
+
+
+/*cteni ze spi s interrupty*/
+
+
 
   /*
   Serial.println(acc.getRange());
@@ -645,18 +693,14 @@ bool init_acc_spi(Acc &acc)
   acc.setRange(ADXL345_RANGE_4_G);
   Serial.println(acc.getRange());
   acc.setRange(ADXL345_RANGE_8_G);
-  Serial.println(acc.getRange());*/
-  acc.setRange(ADXL345_RANGE_16_G);
+  Serial.println(acc.getRange());
+  acc.setRange(ADXL345_RANGE_16_G);*/
   
   
-  
-  return true;
-}
 
 
 bool done;
 long unsigned address = 0;
-long unsigned toread;
 
 
 /*const unsigned int bufsiz = 6;
@@ -689,6 +733,8 @@ void acquire_acc_spi()
   Serial.println(F("spi acquire\n"));  
   Acc acc = Acc(13, 12, 11, csacc);
 
+  reconf();
+
   if(ticks_check)
   {
     noInterrupts();
@@ -698,10 +744,8 @@ void acquire_acc_spi()
     TCCR1B = 1;
     interrupts();
   }
-
-  SPI.begin();
   
-  if (!init_acc_spi(acc))
+  if (!init_acc(acc))
     return;
 
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
@@ -713,8 +757,7 @@ void acquire_acc_spi()
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
   Serial.println(F("flush.."));
 
-simple_read_loop(acc);
-//simple_read_loop(acc);
+  simple_read_loop(acc, 35, false);
   
   Serial.print(F("start: "));
   Serial.println(now_string());
@@ -829,7 +872,7 @@ void spi_read(void)
 
      const int16_t *xyz = (int16_t *) buf;
      char buffer[1+6*(1+5+1)];
-     sprintf(buffer, "%d,%d,%d", xyz[0],xyz[1],xyz[2]);
+     SPRINTF(buffer, "%d,%d,%d", xyz[0],xyz[1],xyz[2]);
      Serial.println(buffer);
 
 
@@ -871,20 +914,42 @@ void spi_read(void)
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+/*SD*/
+
+
+
+
+
+
+
+
+
 void w_timing_end(time_t w_start_time)
 {
   tmElements_t w_end_tm;
   RTC.read(w_end_tm);
-  Serial.print(F("done writing in "));
+  Serial.print(F("done in "));
   Serial.print(makeTime(w_end_tm) - w_start_time);
   //http://pastebin.com/sfEjA94n
-  Serial.println(F(" seconds."));  
+  Serial.println(F("s."));  
 }
 
 
 
-//#define ifsp(x)
-#define ifsp(x) if(serial_print) {x}
+#define ifsp(x)
+//#define ifsp(x) if(serial_print) {x}
+
 #define nl  {ifsp(Serial.println("");) file.print('\n');}
 #define out(x) {ifsp(Serial.print(x);) file.print(x);}
 
@@ -894,7 +959,7 @@ void w_timing_end(time_t w_start_time)
 
 void sd_out()
 {
-
+  now_string();//init
 
   tmElements_t w_start_tm, w_end_tm;
   RTC.read(w_start_tm);
@@ -930,7 +995,7 @@ void sd_out()
   out(time_string(end_tm));
   nl;
   out(F("nsamples:")); out(nsamples);
-  out(F(" datarate:")); out(datarate);
+  out(F(" datarate:")); out(datarate);//todo
   nl;
   
   const unsigned int bufsiz = 156;
@@ -1033,7 +1098,7 @@ void sd_out()
      out("xyz[2]" );
      nl;*/
      char buffer[1+6*(1+5+1)];
-     sprintf(buffer, "%d,%d,%d\n%d,%d,%d\n", xyz[0],xyz[1],xyz[2],xyz[3],xyz[4],xyz[5]);
+     SPRINTF(buffer, "%d,%d,%d\n%d,%d,%d\n", xyz[0],xyz[1],xyz[2],xyz[3],xyz[4],xyz[5]);
      /*zapisovani po dvou usetri jen asi 5s*/
      out(buffer);
     }
@@ -1076,7 +1141,7 @@ void dbg_simple_ram_read()
 
     int16_t* xyz = (int16_t*)buf;
     char buffer[1+6*(1+5+1)];
-    sprintf(buffer, "%d,%d,%d\n", xyz[0],xyz[1],xyz[2]);
+    SPRINTF(buffer, "%d,%d,%d\n", xyz[0],xyz[1],xyz[2]);
     Serial.println(buffer);
    
   }
@@ -1091,7 +1156,7 @@ void test_sd(void)
   Sd2Card card;
 
 
-  Serial.print(F("\nSD init..."));
+  Serial.print(F("\nSD..."));
 
   if (!card.init()) {
     Serial.println(F("failed. is a card inserted?"));
@@ -1099,7 +1164,7 @@ void test_sd(void)
   }
   
   // print the type of card
-  Serial.print(F("\nCard type: "));
+  Serial.print(F("\ntype: "));
   switch (card.type()) {
     case SD_CARD_TYPE_SD1:
       Serial.println(F("SD1"));
@@ -1230,44 +1295,6 @@ void test_sd_speed()
 */
 
 
-
-
-void setup(void) 
-{
-  digitalWrite(csram, 1);
-  digitalWrite(cssd, 1);
-  digitalWrite(csacc, 1);  
-  
-  pinMode(csram, 1);
-  pinMode(cssd, 1);
-  pinMode(csacc, 1);
-
-  Serial.begin(115200);
-  divider();
-  Serial.println(F("setup..."));
-  divider();
-   
-  clear_i2c();
-  init_rtc();
-  
- 
-  SPI.setClockDivider(SPI_CLOCK_DIV2);
-  SPI.setDataMode(SPI_MODE0);  
-
-SPI.begin();
-  
-
-  init_ram();
-
-  samplesize = 3*2;
-  if (ticks_check) samplesize += 4;
-  nsamples = (nsamples ? nsamples : (ramsz/samplesize))&~1;
-  toread = nsamples * samplesize;
-
-}
-
-
-
 /*
 void write_time(void)
 {
@@ -1292,6 +1319,41 @@ void write_time(void)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+void setup(void) 
+{
+  digitalWrite(csram, 1);
+  digitalWrite(cssd, 1);
+  digitalWrite(csacc, 1);  
+  
+  pinMode(csram, 1);
+  pinMode(cssd, 1);
+  pinMode(csacc, 1);
+
+  Serial.begin(115200);
+  divider();
+  Serial.println(F("setup..."));
+  divider();
+   
+  clear_i2c();
+ 
+/*  SPI.setClockDivider(SPI_CLOCK_DIV2);
+  SPI.setDataMode(SPI_MODE0);  */
+
+  SPI.begin();
+  init_ram();
+}
 
 
 
@@ -1336,11 +1398,60 @@ Serial.println(F("selftest done"));
 
 void menu()
 {
-  Serial.println(F("menu"));  
+  char i = 'h';
   
-  m_self_test();
+while(true)
+{
   
-  m_spi_acquire();
+
+  switch (i)
+  {
+    case 'h': Serial.println(F("\n"
+"h - help\n"
+"d - detect HW\n"
+"f - SD card test\n"
+"m - memory test\n"
+"c - real time clock test\n"
+"s - SPI accelerometer test\n"
+"i - I2C accelerometer test\n"
+"r - run (SPI)\n"));
+    break;
+    case 'd':
+      m_self_test();
+    break;
+    case 'f':
+      test_sd(); //az bude misto: zapis nejakeho jednoducheho souboru a jeho zpetne precteni, proste neco jednoducheho na otetsovani SD karty
+    break;
+    case 'm':
+      test_ram();
+    break;
+    case 'c':
+      test_rtc();
+    break;
+    case 's':
+      test_acc_spi();
+    break;
+    case 'i':
+      test_acc_twi();
+    break;
+    case 'r':
+      m_spi_acquire();
+/*     
+> r - run, tedy jeden kompletni cyklus - detekce akcelerometru, pokud bude pripojen I2C, sber dat z nej, 
+pokud nebude, pak sber dat z SPI, pokud nebude ani jeden ukonci se to s chybou. 
+Nabirejte 10s dat (s tim ze v kodu mejte konstantu, kde to pujde "rucne" nastavit na delsi), 
+data zapisujte do SRAM a pak do souboru. Behem tohoto cyklu do terminalu vypisujte jen stavova hlaseni co se deje
+. Jaky akcelerometr detekovan, naber dat do SRAM, zapis na SD kartu, atd. Nikoli uz X Y Z data. 
+A na konci vysledek, OK, error, kde a jaky byl error apod.
+>*/
+
+    break;
+  }
+
+Serial.println('>');  
+while(!Serial.available()) {};
+i = Serial.read();
+}
   
 }
 

@@ -152,5 +152,12 @@ void displayDataRate(Acc &acc);
 void displayRange(Acc &acc);
 
 
+typedef unsigned long HZ;
+
+
+HZ dataRate2hz(dataRate_t dataRate);
+String hz_str(HZ hz);
+String range_str(range_t r);
+
 
 

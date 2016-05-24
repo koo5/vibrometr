@@ -81,20 +81,6 @@ typedef struct {
     uint8_t reserved[3];
 } sensors_vec_t;
 
-/** struct sensors_color_s is used to return color data in a common format. */
-typedef struct {
-    union {
-        float c[3];
-        /* RGB color space */
-        struct {
-            float r;       /**< Red component */
-            float g;       /**< Green component */
-            float b;       /**< Blue component */
-        };
-    };
-    uint32_t rgba;         /**< 24-bit RGBA value */
-} sensors_color_t;
-
 /* Sensor event (36 bytes) */
 /** struct sensor_event_s is used to provide a single sensor event in a common format. */
 typedef struct
@@ -118,7 +104,6 @@ typedef struct
         float           relative_humidity;    /**< relative humidity in percent */
         float           current;              /**< current in milliamps (mA) */
         float           voltage;              /**< voltage in volts (V) */
-        sensors_color_t color;                /**< color in RGB component values */
     };
 } sensors_event_t;
 

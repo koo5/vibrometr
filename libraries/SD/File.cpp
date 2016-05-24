@@ -20,8 +20,10 @@
 
 File::File(SdFile f, const char *n) {
   // oh man you are kidding me, new() doesnt exist? Ok we do it by hand!
+//
   _file = (SdFile *)malloc(sizeof(SdFile)); 
   if (_file) {
+  //
     memcpy(_file, &f, sizeof(SdFile));
     
     strncpy(_name, n, 12);
