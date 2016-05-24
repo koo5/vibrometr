@@ -197,10 +197,8 @@ void clear_i2c() {
 bool rtc_auto_set(void)
 {
   tmElements_t tm;
+  tm.Second = tm.Minute = tm.Hour = tm.Day = tm.Month = tm.Year = 1;
 
-  // get the date and time the compiler was run
-  if (getDate(tm, __DATE__) && getTime(tm, __TIME__))
-  {
     if (RTC.write(tm))
     {
       Serial.println(F("time set."));
@@ -213,65 +211,10 @@ bool rtc_auto_set(void)
     else
     {
       Serial.println(F("rtc err"));
+      return false;
     }
-  }
-  else
-  {
-    Serial.print(F("err11"));/*
-    Serial.print(F("Could not parse info from the compiler, __TIME__=\""));
-    Serial.print(F(__TIME__));
-    Serial.print(F("\", __DATE__=\""));
-    Serial.print(F(__DATE__));
-    Serial.println("\"");*/
-  }
-  return false;
 }
 
-bool getTime(tmElements_t &tm, const char *str)
-{
-  int Hour, Min, Sec;
-
-  if (sscanf(str, "%d:%d:%d", &Hour, &Min, &Sec) != 3)
-  {
-    Serial.println(F("err12"));//error parsing __TIME__"));
-    return false;
-  }
-  tm.Hour = Hour;
-  tm.Minute = Min;
-  tm.Second = Sec;
-  return true;
-}
-
-bool getDate(tmElements_t & tm, const char *str)
-{
-  String monthName = F("JanFebMarAprMayJunJulAugSepOctNovDec");
-  char Month[12];
-  int Day, Year;
-  uint8_t monthIndex;
-
-  if (sscanf(str, "%s %d %d", Month, &Day, &Year) != 3)
-  {
-    Serial.println(F("err13"));//error parsing __DATE__"));
-    return false;
-  }
-
-  for (monthIndex = 0; monthIndex < 12; monthIndex++) {
-    if (
-      Month[0] == monthName[monthIndex*3+0] &&
-      Month[1] == monthName[monthIndex*3+1] &&
-      Month[2] == monthName[monthIndex*3+2]
-    ) break;
-  }
-  if (monthIndex >= 12)
-  {
-    Serial.println(F("err14"));
-    return false;
-  }
-  tm.Day = Day;
-  tm.Month = monthIndex + 1;
-  tm.Year = CalendarYrToTm(Year);
-  return true;
-}
 
 
 String now_string(void)
@@ -587,12 +530,6 @@ void simple_read_loop(Acc &acc, unsigned long count, bool p=true)
   {
     sensors_event_t event; 
     acc.getEvent(&event);
-    if(p)
-    {
-      Serial.print(F("X: ")); Serial.print(event.acceleration.x);
-      Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
-      Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
-    }
   }
 }
 
@@ -865,18 +802,20 @@ void spi_read(void)
 
 
 
-
+    if(just_print)
+    {
+      const int16_t *xyz = (int16_t *) buf;
 /*
-
-
-
-     const int16_t *xyz = (int16_t *) buf;
      char buffer[1+6*(1+5+1)];
      SPRINTF(buffer, "%d,%d,%d", xyz[0],xyz[1],xyz[2]);
      Serial.println(buffer);
-
-
 */
+      Serial.print(F("X: ")); Serial.print(event.acceleration.x);
+      Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
+      Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
+    }
+    else
+    {
     
     SPI.setDataMode(SPI_MODE0);  
     SPI.setClockDivider(SPI_CLOCK_DIV2); 
@@ -995,10 +934,10 @@ void sd_out()
   out(time_string(end_tm));
   nl;
   out(F("nsamples:")); out(nsamples);
-  out(F(" datarate:")); out(datarate);//todo
+  out(F(" datarate:")); out(hz_str(dataRate2hz(datarate)));
   nl;
   
-  const unsigned int bufsiz = 156;
+  const unsigned int bufsiz = 200;
   unsigned int sib = (bufsiz/samplesize)&~1;
   unsigned long address;
   const unsigned int bufused = sib * samplesize;
@@ -1447,6 +1386,10 @@ A na konci vysledek, OK, error, kde a jaky byl error apod.
 
     break;
   }
+
+
+Myslel jsem tim jen aby to nebezelo samo porad dokola. Cim vice to rozkouskujete, tim take lepe, abych mohl otestovat jednotlive casti samostatne. To cele byla idea nad menu. Kdyz menu nejak pozmenite, aby lepe pasovalo k tomu jak mate usporadany jednotlive funkce v SW, tim lepe. Dulezite je menu, vyber fuknce, provedeni akce a zase ukonceni v menu a cekani na dalsi pokyn.
+
 
 Serial.println('>');  
 while(!Serial.available()) {};

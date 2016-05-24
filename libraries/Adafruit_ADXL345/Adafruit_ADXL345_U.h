@@ -17,11 +17,7 @@
 */
 /**************************************************************************/
 
-#if ARDUINO >= 100
  #include "Arduino.h"
-#else
- #include "WProgram.h"
-#endif
 
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
@@ -103,7 +99,7 @@ typedef enum
   ADXL345_RANGE_2_G           = 0b00    // +/- 2g (default value)
 } range_t;
 
-class Adafruit_ADXL345_Unified : public Adafruit_Sensor {
+class Acc {
  public:
   Adafruit_ADXL345_Unified(int32_t sensorID = -1);
   Adafruit_ADXL345_Unified(uint8_t clock, uint8_t miso, uint8_t mosi, uint8_t cs, int32_t sensorID = -1);
@@ -113,37 +109,19 @@ class Adafruit_ADXL345_Unified : public Adafruit_Sensor {
   range_t    getRange(void);
   void       setDataRate(dataRate_t dataRate);
   dataRate_t getDataRate(void);
-  bool       getEvent(sensors_event_t*);
-  void       getSensor(sensor_t*);
 
   uint8_t    getDeviceID(void);
   void       writeRegister(uint8_t reg, uint8_t value);
   uint8_t    readRegister(uint8_t reg);
-  int16_t    read16(uint8_t reg);
-
-  int16_t    getX(void), getY(void), getZ(void);
-
-
-
 
 
   bool    _i2c; //ro
-  uint8_t  i2cread(void);
-  void     i2cwrite(uint8_t x);
-
-
 
 
  private:
 
-
-  int32_t _sensorID;
-  range_t _range;
-  uint8_t _clk, _do, _di, _cs;
+  uint8_t _cs;
 };
-
-
-typedef Adafruit_ADXL345_Unified Acc;
 
 
 
