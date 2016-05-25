@@ -562,77 +562,18 @@ bool init_acc(Acc &acc)
   return true;
 }
 
-void test_acc_spi()
+void test_acc(bool spi)
 {
-  Acc accspi = Acc(13, 12, 11, csacc);
-  Serial.println(F("spi acc.."));
-  test_acc(accspi);
-}
-
-void test_acc_twi()
-{
-  Acc acctwi = Acc(12345);
-  Serial.println(F("\ntwi acc.."));
-  test_acc(acctwi);
+  just_print = true;
+  acquire(spi);
+  just_print = false;
 }
 
 void test_accs()
 {
-  test_acc_spi();  
-  test_acc_twi();
+  test_acc(true);  
+  test_acc(false);
 }
-
-void test_acc(Acc &acc)
-{
-  reconf();
-  
-  if (!init_acc(acc))
-    return;
-  
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
-
-  simple_read_loop(acc, 10 * datarate);
-
-  displayAccDetails(acc); 
-}
-
-
-
-
-
-/**************************************************************************/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*cteni ze spi s interrupty*/
-
-
-
-  /*
-  Serial.println(acc.getRange());
-  acc.setRange(ADXL345_RANGE_2_G);
-  Serial.println(acc.getRange());
-  acc.setRange(ADXL345_RANGE_4_G);
-  Serial.println(acc.getRange());
-  acc.setRange(ADXL345_RANGE_8_G);
-  Serial.println(acc.getRange());
-  acc.setRange(ADXL345_RANGE_16_G);*/
-  
   
 
 
@@ -640,10 +581,12 @@ bool done;
 long unsigned address = 0;
 
 
-/*const unsigned int bufsiz = 6;
+/*for fifo
+ * const unsigned int bufsiz = 6;
 unsigned int bufpos = 0;
 char buf[bufsiz];
 */
+
 const byte RD = 1 << 7;
 const byte MB = 1 << 6;
 
@@ -669,6 +612,20 @@ void acquire_acc_spi()
 
   Serial.println(F("spi acquire\n"));  
   Acc acc = Acc(13, 12, 11, csacc);
+  acquire(acc);
+}
+
+void acquire_acc_twi()
+{
+
+  Serial.println(F("spi acquire\n"));  
+  Acc acc = Acc();
+  acquire(acc);
+}
+
+
+void acquire(Acc &acc)
+{
 
   reconf();
 
@@ -685,17 +642,8 @@ void acquire_acc_spi()
   if (!init_acc(acc))
     return;
 
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
-    
   displayAccDetails(acc);  
 
-//simple_read_loop(acc);  
-
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
-  Serial.println(F("flush.."));
-
-  simple_read_loop(acc, 35, false);
-  
   Serial.print(F("start: "));
   Serial.println(now_string());
   Serial.println(F("sampling.."));
@@ -704,11 +652,16 @@ void acquire_acc_spi()
   attachInterrupt(digitalPinToInterrupt(3), spi_int, FALLING);  
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
 
+  //flush
   dead = 0;
   address = 1;
-  while(address < 35*samplesize) 
+  while(address < 100*samplesize)
+  {
+    do_read = true;
     spi_read();
+  }
 
+  dead = 0;
   address = 0;
   done = false;
   while(!done) 
@@ -723,7 +676,7 @@ void acquire_acc_spi()
   Serial.print(F("end: "));   Serial.println(time_string(end_tm));
   
 }
-/*z acc to leze ok, z pameti spatne*/
+
 volatile unsigned int ticks;
 volatile unsigned int old_ticks = 65536;
 volatile unsigned long periods = 0;
@@ -841,7 +794,7 @@ void spi_read(void)
     
     digitalWrite(sram.cs_pin, HIGH); 
     
-  
+    }
     
     if (address == toread)
     {
