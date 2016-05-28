@@ -10,8 +10,7 @@
 
 /*konfigurace*/
 
-/*true/false*/
-const bool ticks_check = false;
+//vypisovani verbatim toho co se zapisuje do souboru na seriak
 const bool serial_print = 1;
 
 dataRate_t conf_datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
@@ -22,7 +21,6 @@ In [5]: (1024**2)/8/6/3200
 Out[5]: 6.826666666666666*/
 unsigned int conf_duration = 6;
 
-//uint32_t conf_nsamples = 0;//0=10s
 
 const byte cssd = 10;
 const byte csacc = 9;
@@ -35,20 +33,19 @@ const uint32_t ramsz = 1024L*1024L/8L;
 SRAM sram(csram);
 tmElements_t end_tm;
 byte samplesize ;
-long dead;
-long unsigned toread; //bytes
-dataRate_t datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
-uint32_t nsamples = 6;
+long unsigned toread; //kolik bajtu samplu precist z acc a zapsat do ram
+dataRate_t datarate;
+uint32_t nsamples;//kolik samplu
 
 
-void reconf()
+void reconf(bool spi)
 {
   datarate = conf_datarate;
+
+  if (!spi)
+    datarate = max(ADXL345_DATARATE_800_HZ, datarate);
   
   samplesize = 3*2;
-  if (ticks_check) samplesize += 4;
-  //nsamples = (nsamples ? nsamples : (ramsz/samplesize));
-
 
   unsigned int hz = 3200/(16-datarate);
   
@@ -227,7 +224,7 @@ String now_string(void)
   {
     if (RTC.chipPresent())
     {
-      Serial.println(F("RTC stopped. setting time..."));
+      Serial.println(F("RTC stopped. please set time."));
       if(rtc_auto_set())
         return now_string();
     }
@@ -387,166 +384,22 @@ void test_ram()
 }
 
 
-/*
-void test_ram() 
-{
-  uint32_t address = 0;
-  const uint32_t bs = 1024L*256L;
-  Serial.println(F("sram test:"));
-  for(address = 0; address < ramsz; address+=bs)
-  {
-      Serial.print(address);
-      Serial.print(":");
-
-
-      sram_start(SRAM_WRITE, address);
-      uint32_t d;
-      for(d = 0; d < bs/4; d++)
-      {
-        uint32_t b = address + d;
-        //Serial.println(b);
-        //Serial.println("b");
-        for (int a = 0; a < 4; a++)
-        {
-          //byte tb = *(((byte*)&b)+a);
-          //Serial.println((long)tb);
-           //SPI.transfer(tb);
-           SPI.transfer(b);
-           
-        }
-        
-        //for (int a = 0; a < 4; a++)
-          //SPI.transfer(a);
-      }
-      digitalWrite(sram.cs_pin, HIGH);
-
-      Serial.print("..");
-
-      sram_start(SRAM_READ, address);
-      for(d = 0; d < bs/4; d++)
-      {
-        uint32_t data;
-        byte expt = address + d;
-        for (int a = 0; a < 4; a++)
-        {
-          data = SPI.transfer(0);
-          //byte r = SPI.transfer(0);
-          //Serial.println((long)r);
-          //*((((byte*)&data)+a)) = r;
-          //if (SPI.transfer(0) != a) Serial.println("err");
-        }
-        //data = data & ~(32768);
-        
-        if (data != expt)
-        {
-          Serial.print(data);
-          Serial.print("!=");
-          Serial.println(expt);
-        }
-      }
-      digitalWrite(sram.cs_pin, HIGH);
-      Serial.println(F("done"));
-  }
-}
-*/
 
 
 
 
-
-
-
-
-
-
-
-
-
-/*
-bool init_acc_twi(Acc &acc)
-{
-  if(!acc.begin())
-  {
-    Serial.println(F("not detected"));
-    return false;
-  }
-  Wire.setClock(400000L);
-  acc.setDataRate(ADXL345_DATARATE_800_HZ);
-  
-  acc.setRange(ADXL345_RANGE_16_G);
-  acc.writeRegister(ADXL345_REG_FIFO_CTL, 0b10000000);//stream mode
-  acc.writeRegister(ADXL345_REG_INT_ENABLE, 0b10000000);//DATA_READY (na INT1)
-  return true;
-}
-*/
-
-
-/*
-void acc_twi_flush(unsigned int count = 50)
-{
-  for (int i = 0; i < count; i++)
-  {
-    Wire.beginTransmission(ADXL345_ADDRESS);
-    Wire.write(ADXL345_REG_DATAX0);
-    Wire.endTransmission();
-    Wire.requestFrom(ADXL345_ADDRESS, 1);
-    Wire.read();
-  }
-}
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*testovaci jednoduzsi pomale cteni*/
-
-
-void simple_read_loop(Acc &acc, unsigned long count, bool p=true)
-{
-  long x;
-  for(x = 0; x < nsamples; x++)
-  {
-    sensors_event_t event; 
-    acc.getEvent(&event);
-  }
-}
+bool just_print = false;
+byte sample_size = 6;
+long unsigned address = 0;
+bool use_spi;
+bool do_wait = true;
 
 bool init_acc(Acc &acc)
 {
 
-  if (!acc._i2c)
-  {
-    SPI.setClockDivider(SPI_CLOCK_DIV4);
-    SPI.setDataMode(SPI_MODE3);
-    datarate = ADXL345_DATARATE_3200_HZ;
-  }
-  else
-  {
-    Wire.setClock(400000L);
-    datarate = ADXL345_DATARATE_800_HZ;
-  }
+  Wire.setClock(400000L);
+  SPI.setClockDivider(SPI_CLOCK_DIV4);
+  SPI.setDataMode(SPI_MODE3);
   
   if(!acc.begin())
   {
@@ -565,20 +418,13 @@ bool init_acc(Acc &acc)
 void test_acc(bool spi)
 {
   just_print = true;
-  acquire(spi);
+  if(spi)
+    acquire_acc_spi();
+  else
+    acquire_acc_twi();
   just_print = false;
 }
-
-void test_accs()
-{
-  test_acc(true);  
-  test_acc(false);
-}
   
-
-
-bool done;
-long unsigned address = 0;
 
 
 /*for fifo
@@ -590,35 +436,20 @@ char buf[bufsiz];
 const byte RD = 1 << 7;
 const byte MB = 1 << 6;
 
-byte sample_size = 6;
-
-volatile bool do_read;
-
-
-
-
-
-
-void acc_spi_flush(unsigned int count = 40)
-{
-    
-  /*zda se ze prilis rychle cteni zpusobi zablokovani adxl*/
-}
-
 
 
 void acquire_acc_spi()
 {
 
   Serial.println(F("spi acquire\n"));  
-  Acc acc = Acc(13, 12, 11, csacc);
+  Acc acc = Acc(csacc);
   acquire(acc);
 }
 
 void acquire_acc_twi()
 {
 
-  Serial.println(F("spi acquire\n"));  
+  Serial.println(F("i2c acquire\n"));  
   Acc acc = Acc();
   acquire(acc);
 }
@@ -627,48 +458,31 @@ void acquire_acc_twi()
 void acquire(Acc &acc)
 {
 
-  reconf();
+  reconf(!acc._i2c);
 
-  if(ticks_check)
-  {
-    noInterrupts();
-    TIMSK0 = 0;
-    TIMSK1 = 0;
-    TCCR1A = 0;
-    TCCR1B = 1;
-    interrupts();
-  }
   
   if (!init_acc(acc))
     return;
 
+  use_spi = !acc._i2c;
+
   displayAccDetails(acc);  
 
+  Serial.println(F("flush.."));
+  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
+  do_wait = false;
+  for(byte i = 0; i < 50; i++)
+    acc_read();
+  do_wait = true;
   Serial.print(F("start: "));
   Serial.println(now_string());
-  Serial.println(F("sampling.."));
-
-  do_read = false;
-  attachInterrupt(digitalPinToInterrupt(3), spi_int, FALLING);  
-  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);   // Enable measurements
-
-  //flush
-  dead = 0;
-  address = 1;
-  while(address < 100*samplesize)
-  {
-    do_read = true;
-    spi_read();
-  }
-
-  dead = 0;
+  SPI.setClockDivider(SPI_CLOCK_DIV4); 
+  SPI.setDataMode(SPI_MODE3);
+  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
   address = 0;
-  done = false;
-  while(!done) 
-    spi_read();
-
-  detachInterrupt(digitalPinToInterrupt(3));
-
+  while(address < nsamples * samplesize)
+    acc_read();
+  
   SPI.setDataMode(SPI_MODE0);  
   SPI.setClockDivider(SPI_CLOCK_DIV2); 
 
@@ -677,132 +491,106 @@ void acquire(Acc &acc)
   
 }
 
-volatile unsigned int ticks;
-volatile unsigned int old_ticks = 65536;
-volatile unsigned long periods = 0;
 
-void spi_int(void) 
+void acc_wait(void)
 {
-  do_read = true;
-  
-  if (ticks_check )
+  byte entries;
+  do
   {
-  ticks = TCNT1;
-  if (ticks < old_ticks)
-  {
-    periods++;
-  }
-  old_ticks = ticks;
-  }
-}
-
-
-void spi_read(void)
-{    
-  if(!do_read)
-  {
-    dead++;
-    if (dead > 100000)
-    {
-      Serial.print(F("int pin dead at "));
-      Serial.println((long)digitalRead(3)); 
-      //nezvladali jsme dost rychle cist a clearovat interrupt flag, takze 
-       // uz nedostavame interrupt pri novem samplu
-       
-      dead = 0;
-    }
-    return;
-  }
-  
-  do_read = false;
-
-  dead = 0;
+    byte status;
+    //Serial.println(F("waiting for samples."));
     
-
-
-    if (!(address & 0b11111111))
+    if(use_spi)
     {
-     Serial.print('.');//address);//);
-    }
-
-
-      SPI.setClockDivider(SPI_CLOCK_DIV4); 
-      SPI.setDataMode(SPI_MODE3);
-
-      digitalWrite(csacc, LOW);
-
-      SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
-      
-      char buf[6];
-      for (int a = 0; a < 6; a++)
-      {
-        buf[a] = SPI.transfer(0);
-      }
-
-      /*
-      SPI.transfer(0); // FIFO_CTL zahodime
-      byte status = SPI.transfer(0);
-      byte entries;
-      entries = status & 0b111111;
-      //Serial.println(entries);
-      if (entries > 0) 
-      {
-        Serial.println(F("overflow"));
-      }
-      */
-
-    digitalWrite(csacc, HIGH);
-
-
-
-    if(just_print)
-    {
-      const int16_t *xyz = (int16_t *) buf;
-/*
-     char buffer[1+6*(1+5+1)];
-     SPRINTF(buffer, "%d,%d,%d", xyz[0],xyz[1],xyz[2]);
-     Serial.println(buffer);
-*/
-      Serial.print(F("X: ")); Serial.print(event.acceleration.x);
-      Serial.print(F("  Y: ")); Serial.print(event.acceleration.y);
-      Serial.print(F("  Z: ")); Serial.println(event.acceleration.z); 
+        SPI.setClockDivider(SPI_CLOCK_DIV4); 
+        SPI.setDataMode(SPI_MODE3);
+        digitalWrite(csacc, LOW);
+        SPI.transfer(ADXL345_REG_FIFO_STATUS | RD);
+        status = SPI.transfer(0);
+        digitalWrite(csacc, HIGH);
     }
     else
     {
-    
-    SPI.setDataMode(SPI_MODE0);  
-    SPI.setClockDivider(SPI_CLOCK_DIV2); 
-    
-    sram_start(SRAM_WRITE, address);
-    
-    if (ticks_check)
-    {
-      address += 4;
-      unsigned long cycles = (ticks + periods * 65536);
-      for (int a = 0; a < 4; a++)
+        Wire.beginTransmission(ADXL345_ADDRESS);
+        Wire.write(ADXL345_REG_FIFO_STATUS);
+        Wire.endTransmission();
+        Wire.requestFrom(ADXL345_ADDRESS, 1);
+        status = Wire.read();
+    }
+          
+    entries = status & 0b111111;
+  }
+  while(!entries);
+}
+
+
+
+void acc_read(void)
+{    
+      char buf[6];
+      byte entries = 123;
+      byte status ;
+      bool last;
+
+      if(use_spi)
       {
-        SPI.transfer(((byte*)&cycles)[a]);
+        SPI.setClockDivider(SPI_CLOCK_DIV4); 
+        SPI.setDataMode(SPI_MODE3);
+        digitalWrite(csacc, LOW);
+        SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
+        for (int a = 0; a < 6; a++)
+          buf[a] = SPI.transfer(0);
+        SPI.transfer(0); // FIFO_CTL zahodime
+        status = SPI.transfer(0);
+        digitalWrite(csacc, HIGH);
       }
-    }
+      else
+      {
+        Wire.beginTransmission(ADXL345_ADDRESS);
+        Wire.write(ADXL345_REG_DATAX0);
+        Wire.endTransmission();
+        Wire.requestFrom(ADXL345_ADDRESS, 1);
+        for (int a = 0; a < 6; a++)
+            buf[a] = Wire.read();
+        Wire.read();
+        status = Wire.read();
+      }
+
+      entries = status & 0b111111;
+      if (entries > 30 && ! just_print) 
+      {
+          Serial.println(F("overflow"));
+      }
+
+      if(entries == 0 && do_wait)
+      {
+        acc_wait();
+      }
   
-    address += 6;
-    for (int a = 0; a < 6; a++)
-    {
-      SPI.transfer(buf[a]);
-    } 
-    
-    
-    digitalWrite(sram.cs_pin, HIGH); 
-    
-    }
-    
-    if (address == toread)
-    {
-     done = true;
-     Serial.println(F("done"));
-    }
-    
+      if(just_print)
+      {
+        const int16_t *xyz = (int16_t *) buf;
+        char buffer[1+6*(1+5+1)];
+        SPRINTF(buffer, "%d,%d,%d", xyz[0],xyz[1],xyz[2]);
+        Serial.println(buffer);
+      }
+      else
+      {
+        SPI.setDataMode(SPI_MODE0);  
+        SPI.setClockDivider(SPI_CLOCK_DIV2); 
+        sram_start(SRAM_WRITE, address);
+        for (int a = 0; a < 6; a++)
+          SPI.transfer(buf[a]);
+        digitalWrite(sram.cs_pin, HIGH); 
+      }
   
+      if (!(address & 0b11111111))
+      {
+       Serial.print('.');//address);//);
+      }
+  
+      address += 6;
+     
 }
 
 
@@ -1214,7 +1002,7 @@ void write_time(void)
 
 
 
-
+  /*zda se ze prilis rychle cteni zpusobi zablokovani adxl*/
 
 
 
@@ -1281,7 +1069,9 @@ divider();
   test_sd_speed();
 divider();  */
 
-  test_accs();
+  test_acc(true);
+  test_acc(false);
+  
 divider();  
 
 Serial.println(F("selftest done"));
@@ -1321,10 +1111,10 @@ while(true)
       test_rtc();
     break;
     case 's':
-      test_acc_spi();
+      test_acc(true);
     break;
     case 'i':
-      test_acc_twi();
+      test_acc(false);
     break;
     case 'r':
       m_spi_acquire();
@@ -1341,7 +1131,7 @@ A na konci vysledek, OK, error, kde a jaky byl error apod.
   }
 
 
-Myslel jsem tim jen aby to nebezelo samo porad dokola. Cim vice to rozkouskujete, tim take lepe, abych mohl otestovat jednotlive casti samostatne. To cele byla idea nad menu. Kdyz menu nejak pozmenite, aby lepe pasovalo k tomu jak mate usporadany jednotlive funkce v SW, tim lepe. Dulezite je menu, vyber fuknce, provedeni akce a zase ukonceni v menu a cekani na dalsi pokyn.
+//Myslel jsem tim jen aby to nebezelo samo porad dokola. Cim vice to rozkouskujete, tim take lepe, abych mohl otestovat jednotlive casti samostatne. To cele byla idea nad menu. Kdyz menu nejak pozmenite, aby lepe pasovalo k tomu jak mate usporadany jednotlive funkce v SW, tim lepe. Dulezite je menu, vyber fuknce, provedeni akce a zase ukonceni v menu a cekani na dalsi pokyn.
 
 
 Serial.println('>');  
