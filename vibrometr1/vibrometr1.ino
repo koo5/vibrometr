@@ -13,8 +13,10 @@
 //vypisovani verbatim toho co se zapisuje do souboru na seriak
 const bool serial_print = 1;
 
-dataRate_t conf_datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
+dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
 
+const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV16;
+const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV16;
 
 /*
 In [5]: (1024**2)/8/6/3200
@@ -287,7 +289,7 @@ void test_rtc() {
 
 void init_ram(void)
 {
-//  SPI.setClockDivider(SPI_CLOCK_DIV2); 
+  SPI.setClockDivider(SPI_CLOCK_RAM); 
   digitalWrite(sram.cs_pin, LOW);
   SPI.transfer(SRAM_WRSR);
   SPI.transfer(sram.mode);
@@ -305,7 +307,7 @@ void sram_start(byte mode, unsigned long address)
 
 void test_ram() 
 {
-  SPI.setClockDivider(SPI_CLOCK_DIV2); 
+  SPI.setClockDivider(SPI_CLOCK_RAM); 
   Serial.println(F("sram test:"));
  
   uint32_t address = 0;
@@ -398,7 +400,7 @@ bool init_acc(Acc &acc)
 {
 
   Wire.setClock(400000L);
-  SPI.setClockDivider(SPI_CLOCK_DIV4);
+  SPI.setClockDivider(SPI_CLOCK_ACC);
   SPI.setDataMode(SPI_MODE3);
   
   if(!acc.begin())
@@ -476,7 +478,7 @@ void acquire(Acc &acc)
   do_wait = true;
   Serial.print(F("start: "));
   Serial.println(now_string());
-  SPI.setClockDivider(SPI_CLOCK_DIV4); 
+  SPI.setClockDivider(SPI_CLOCK_ACC); 
   SPI.setDataMode(SPI_MODE3);
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
   address = 0;
@@ -484,7 +486,7 @@ void acquire(Acc &acc)
     acc_read();
   
   SPI.setDataMode(SPI_MODE0);  
-  SPI.setClockDivider(SPI_CLOCK_DIV2); 
+  SPI.setClockDivider(SPI_CLOCK_RAM); 
 
   RTC.read(end_tm);
   Serial.print(F("end: "));   Serial.println(time_string(end_tm));
@@ -502,7 +504,7 @@ void acc_wait(void)
     
     if(use_spi)
     {
-        SPI.setClockDivider(SPI_CLOCK_DIV4); 
+        SPI.setClockDivider(SPI_CLOCK_ACC); 
         SPI.setDataMode(SPI_MODE3);
         digitalWrite(csacc, LOW);
         SPI.transfer(ADXL345_REG_FIFO_STATUS | RD);
@@ -534,7 +536,7 @@ void acc_read(void)
 
       if(use_spi)
       {
-        SPI.setClockDivider(SPI_CLOCK_DIV4); 
+        SPI.setClockDivider(SPI_CLOCK_ACC); 
         SPI.setDataMode(SPI_MODE3);
         digitalWrite(csacc, LOW);
         SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
@@ -577,7 +579,7 @@ void acc_read(void)
       else
       {
         SPI.setDataMode(SPI_MODE0);  
-        SPI.setClockDivider(SPI_CLOCK_DIV2); 
+        SPI.setClockDivider(SPI_CLOCK_RAM); 
         sram_start(SRAM_WRITE, address);
         for (int a = 0; a < 6; a++)
           SPI.transfer(buf[a]);
