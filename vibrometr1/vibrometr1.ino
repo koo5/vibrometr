@@ -17,6 +17,7 @@ dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
 
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV16;
 const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV16;
+const unsigned long WIRE_FREQ = 100000;
 
 /*
 In [5]: (1024**2)/8/6/3200
@@ -399,7 +400,7 @@ bool do_wait = true;
 bool init_acc(Acc &acc)
 {
 
-  Wire.setClock(400000L);
+  Wire.setClock(WIRE_FREQ);
   SPI.setClockDivider(SPI_CLOCK_ACC);
   SPI.setDataMode(SPI_MODE3);
   
