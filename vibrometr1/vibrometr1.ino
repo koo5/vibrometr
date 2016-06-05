@@ -60,13 +60,9 @@ dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
 
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV16;
 const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV16;
-const unsigned long WIRE_FREQ = 100000;
-
-
-//#ifdef newspi
-
-
-
+const byte SPI_CLOCK_SD = SPI_CLOCK_DIV16;
+const unsigned long WIRE_ACC_FREQ = 100000;//400000
+const unsigned long WIRE_RTC_FREQ = 100000;
 
 
 /*
@@ -117,6 +113,56 @@ void reconf(bool spi)
 
 
 
+#ifdef newspi
+void spi_ram_start()
+{
+  SPI.beginTransaction(SPISettings(SPI_CLOCK_RAM, MSBFIRST, SPI_MODE0));
+  digitalWrite(sram.cs_pin, LOW);
+}
+void spi_sd_start()
+{
+  SPI.beginTransaction(SPISettings(SPI_CLOCK_SD, MSBFIRST, SPI_MODE0));
+}
+void spi_acc_start()
+{
+  SPI.beginTransaction(SPISettings(SPI_CLOCK_ACC, MSBFIRST, SPI_MODE3));
+  digitalWrite(csacc, LOW);
+}
+void spi_end()
+{
+  digitalWrite(sram.cs_pin, HIGH);
+  digitalWrite(csacc, HIGH);
+  SPI.endTransaction();
+}
+
+#else
+void spi_ram_start()
+{
+  SPI.setClockDivider(SPI_CLOCK_RAM); 
+  SPI.setDataMode(SPI_MODE0);
+  SPI.begin();
+  digitalWrite(sram.cs_pin, LOW);
+}
+void spi_sd_start()
+{
+  SPI.setClockDivider(SPI_CLOCK_SD); 
+  SPI.setDataMode(SPI_MODE0);
+  SPI.begin();
+}
+void spi_acc_start()
+{
+  SPI.setClockDivider(SPI_CLOCK_RAM); 
+  SPI.setDataMode(SPI_MODE0);
+  SPI.begin();
+  digitalWrite(csacc, LOW);
+}
+void spi_end()
+{
+  digitalWrite(sram.cs_pin, HIGH);
+  digitalWrite(csacc, HIGH);
+  SPI.end();
+}
+#endif
 
 
 void divider(void)
@@ -271,7 +317,7 @@ String now_string(void)
 {
   tmElements_t tm;
 
-  if (RTC.read(tm))
+  if (rtc_read(tm))
     return time_string(tm);
   else
   {
@@ -325,7 +371,11 @@ void test_rtc() {
 }
 
 
-
+bool rtc_read(tmElements_t &tm)
+{
+  Wire.setClock(WIRE_RTC_FREQ );
+  return RTC.read(tm);
+}
 
 
 
@@ -340,16 +390,16 @@ void test_rtc() {
 
 void init_ram(void)
 {
-  SPI.setClockDivider(SPI_CLOCK_RAM); 
-  digitalWrite(sram.cs_pin, LOW);
+  spi_ram_start();
   SPI.transfer(SRAM_WRSR);
   SPI.transfer(sram.mode);
   digitalWrite(sram.cs_pin, HIGH);
+  spi_end();
 }
 
 void sram_start(byte mode, unsigned long address)
 {
-    digitalWrite(sram.cs_pin, LOW);
+    spi_ram_start();
     SPI.transfer(mode);
     SPI.transfer((address >> 16) & 0xFF);
     SPI.transfer((address >> 8)  & 0xFF);
@@ -358,7 +408,6 @@ void sram_start(byte mode, unsigned long address)
 
 void test_ram() 
 {
-  SPI.setClockDivider(SPI_CLOCK_RAM); 
   Serial.println(F("sram test:"));
  
   uint32_t address = 0;
@@ -393,8 +442,8 @@ void test_ram()
         SPI.transfer(d3);
         SPI.transfer(d4);
   }
-  digitalWrite(sram.cs_pin, HIGH);
-
+  spi_end();
+  
   Serial.print("..");
 
   sram_start(SRAM_READ, address);
@@ -433,7 +482,7 @@ void test_ram()
   }
   digitalWrite(sram.cs_pin, HIGH);
   Serial.println(F("done"));
-
+  spi_end();
 }
 
 
@@ -450,9 +499,8 @@ bool do_wait = true;
 bool init_acc(Acc &acc)
 {
 
-  Wire.setClock(WIRE_FREQ);
-  SPI.setClockDivider(SPI_CLOCK_ACC);
-  SPI.setDataMode(SPI_MODE3);
+  Wire.setClock(WIRE_ACC_FREQ);
+  spi_acc_start();
   
   if(!acc.begin())
   {
@@ -523,23 +571,21 @@ void acquire(Acc &acc)
 
   Serial.println(F("flush.."));
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
+  spi_end();
   do_wait = false;
   for(byte i = 0; i < 50; i++)
     acc_read();
   do_wait = true;
   Serial.print(F("start: "));
   Serial.println(now_string());
-  SPI.setClockDivider(SPI_CLOCK_ACC); 
-  SPI.setDataMode(SPI_MODE3);
+  spi_acc_start();
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
+  spi_end();
   address = 0;
   while(address < nsamples * samplesize)
     acc_read();
   
-  SPI.setDataMode(SPI_MODE0);  
-  SPI.setClockDivider(SPI_CLOCK_RAM); 
-
-  RTC.read(end_tm);
+  rtc_read(end_tm);
   Serial.print(F("end: "));   Serial.println(time_string(end_tm));
   
 }
@@ -555,12 +601,10 @@ void acc_wait(void)
     
     if(use_spi)
     {
-        SPI.setClockDivider(SPI_CLOCK_ACC); 
-        SPI.setDataMode(SPI_MODE3);
-        digitalWrite(csacc, LOW);
+        spi_acc_start();
         SPI.transfer(ADXL345_REG_FIFO_STATUS | RD);
         status = SPI.transfer(0);
-        digitalWrite(csacc, HIGH);
+        spi_end();
     }
     else
     {
@@ -587,15 +631,13 @@ void acc_read(void)
 
       if(use_spi)
       {
-        SPI.setClockDivider(SPI_CLOCK_ACC); 
-        SPI.setDataMode(SPI_MODE3);
-        digitalWrite(csacc, LOW);
+        spi_acc_start();
         SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
         for (int a = 0; a < 6; a++)
           buf[a] = SPI.transfer(0);
         SPI.transfer(0); // FIFO_CTL zahodime
         status = SPI.transfer(0);
-        digitalWrite(csacc, HIGH);
+        spi_end();
       }
       else
       {
@@ -629,12 +671,10 @@ void acc_read(void)
       }
       else
       {
-        SPI.setDataMode(SPI_MODE0);  
-        SPI.setClockDivider(SPI_CLOCK_RAM); 
         sram_start(SRAM_WRITE, address);
         for (int a = 0; a < 6; a++)
           SPI.transfer(buf[a]);
-        digitalWrite(sram.cs_pin, HIGH); 
+        spi_end();
       }
   
       if (!(address & 0b11111111))
@@ -671,7 +711,7 @@ void acc_read(void)
 void w_timing_end(time_t w_start_time)
 {
   tmElements_t w_end_tm;
-  RTC.read(w_end_tm);
+  rtc_read(w_end_tm);
   Serial.print(F("done in "));
   Serial.print(makeTime(w_end_tm) - w_start_time);
   //http://pastebin.com/sfEjA94n
@@ -695,9 +735,10 @@ void sd_out()
   now_string();//init
 
   tmElements_t w_start_tm, w_end_tm;
-  RTC.read(w_start_tm);
+  rtc_read(w_start_tm);
   time_t w_start_time = makeTime(w_start_tm);
 
+  spi_sd_start();
   
   Serial.print(F("ok..")); 
   SDClass sd;
@@ -736,6 +777,8 @@ void sd_out()
   unsigned long address;
   const unsigned int bufused = sib * samplesize;
 
+  spi_end();
+
   for(address = 0; address + bufused < toread; address += bufused)
   {
   
@@ -749,7 +792,8 @@ void sd_out()
       buf[b] = SPI.transfer(0);
     }
 
-    digitalWrite(sram.cs_pin, HIGH);
+    spi_end();
+    spi_sd_start();
 
 
     //if(!serial_print)
@@ -763,7 +807,7 @@ void sd_out()
         Serial.print(sib * samplesize);*/    
         Serial.print(F(".."));
   
-        RTC.read(w_end_tm);
+        rtc_read(w_end_tm);
         Serial.print(address / (makeTime(w_end_tm) - w_start_time));
         Serial.println(F(" samplebytes/second"));  
       }
@@ -835,10 +879,12 @@ void sd_out()
      /*zapisovani po dvou usetri jen asi 5s*/
      out(buffer);
     }
+
   }
   file.flush();
   sd.end();
-
+  
+  spi_end();
 
   w_timing_end(w_start_time);
 
@@ -1131,14 +1177,6 @@ Serial.println(F("selftest done"));
 }
 
 
-void menu()
-{
-  char i = 'h';
-
-
-
-
-
 
 
 
@@ -1220,9 +1258,9 @@ void lcd_test()
 
 
 
-
-
-
+void menu()
+{
+  char i = 'h';
   
 while(true)
 {
