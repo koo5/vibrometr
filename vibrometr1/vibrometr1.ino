@@ -151,8 +151,8 @@ void spi_sd_start()
 }
 void spi_acc_start()
 {
-  SPI.setClockDivider(SPI_CLOCK_RAM); 
-  SPI.setDataMode(SPI_MODE0);
+  SPI.setClockDivider(SPI_CLOCK_ACC); 
+  SPI.setDataMode(SPI_MODE3);
   SPI.begin();
   digitalWrite(csacc, LOW);
 }
@@ -331,6 +331,7 @@ String now_string(void)
     {
       String r = String(F("RTCerror"));
       Serial.println(r);//!  Please check the circuitry.
+      return r;
     }
   }
   
@@ -363,7 +364,7 @@ String fn_time_string(tmElements_t &tm)
 
 void test_rtc() {
   Serial.println(F("DS1307RTC Test"));
-  for (byte i = 0; i < 10; i++)
+  for (byte i = 0; i < 3; i++)
   {
     Serial.println(now_string());
     delay(1000);
@@ -627,7 +628,7 @@ void acc_read(void)
       char buf[6];
       byte entries = 123;
       byte status ;
-      bool last;
+     
 
       if(use_spi)
       {
@@ -844,8 +845,8 @@ void sd_out()
      }*/
 
      int16_t xyz[6];
-     char i0,i1;
-     int16_t v;
+     
+     
 
      /*if(bufpos >= bufsiz)
         Serial.print("err");*/
@@ -1214,9 +1215,10 @@ void lcd_test()
 //--(end setup )---
 
 
-//void loop()
-
+while(true)
+{
   lcd.LCD_write_string(1, 1, "PUSH A BUTTON", MENU_NORMAL);
+  delay(1000);
   switchVoltage = analogRead(0);
   Serial.print("Switch analog value = ");
   Serial.println(switchVoltage);
@@ -1249,7 +1251,7 @@ void lcd_test()
     lcd.LCD_write_string(2, 2, "NONE    ", MENU_NORMAL);
     delay(switchDelay);
   }
-
+}
 }
 
 
@@ -1276,7 +1278,11 @@ while(true)
 "c - real time clock test\n"
 "s - SPI accelerometer test\n"
 "i - I2C accelerometer test\n"
-"r - run (SPI)\n"));
+"r - run (SPI)\n"
+"l - lcd test\n"
+"o - loop spi acquire\n"
+
+));
     break;
     case 'd':
       m_self_test();
@@ -1299,22 +1305,14 @@ while(true)
     case 'r':
       m_spi_acquire();
     break;
-/*     
-> r - run, tedy jeden kompletni cyklus - detekce akcelerometru, pokud bude pripojen I2C, sber dat z nej, 
-pokud nebude, pak sber dat z SPI, pokud nebude ani jeden ukonci se to s chybou. 
-Nabirejte 10s dat (s tim ze v kodu mejte konstantu, kde to pujde "rucne" nastavit na delsi), 
-data zapisujte do SRAM a pak do souboru. Behem tohoto cyklu do terminalu vypisujte jen stavova hlaseni co se deje
-. Jaky akcelerometr detekovan, naber dat do SRAM, zapis na SD kartu, atd. Nikoli uz X Y Z data. 
-A na konci vysledek, OK, error, kde a jaky byl error apod.
->*/
+    case 'o':
+      while(true)
+        m_spi_acquire();
+    break;
     case 'l':
       lcd_test();
     break;
   }
-
-
-//Myslel jsem tim jen aby to nebezelo samo porad dokola. Cim vice to rozkouskujete, tim take lepe, abych mohl otestovat jednotlive casti samostatne. To cele byla idea nad menu. Kdyz menu nejak pozmenite, aby lepe pasovalo k tomu jak mate usporadany jednotlive funkce v SW, tim lepe. Dulezite je menu, vyber fuknce, provedeni akce a zase ukonceni v menu a cekani na dalsi pokyn.
-
 
 Serial.println('>');  
 while(!Serial.available()) {};
@@ -1323,4 +1321,16 @@ i = Serial.read();
   
 }
 
+
+
+
+/*     
+> r - run, tedy jeden kompletni cyklus - detekce akcelerometru, pokud bude pripojen I2C, sber dat z nej, 
+pokud nebude, pak sber dat z SPI, pokud nebude ani jeden ukonci se to s chybou. 
+Nabirejte 10s dat (s tim ze v kodu mejte konstantu, kde to pujde "rucne" nastavit na delsi), 
+data zapisujte do SRAM a pak do souboru. Behem tohoto cyklu do terminalu vypisujte jen stavova hlaseni co se deje
+. Jaky akcelerometr detekovan, naber dat do SRAM, zapis na SD kartu, atd. Nikoli uz X Y Z data. 
+A na konci vysledek, OK, error, kde a jaky byl error apod.
+>*/
+//Myslel jsem tim jen aby to nebezelo samo porad dokola. Cim vice to rozkouskujete, tim take lepe, abych mohl otestovat jednotlive casti samostatne. To cele byla idea nad menu. Kdyz menu nejak pozmenite, aby lepe pasovalo k tomu jak mate usporadany jednotlive funkce v SW, tim lepe. Dulezite je menu, vyber fuknce, provedeni akce a zase ukonceni v menu a cekani na dalsi pokyn.
 

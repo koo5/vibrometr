@@ -91,15 +91,15 @@ void LCD4884::LCD_write_byte(unsigned char dat, unsigned char dat_type)
 	{ 
 		if(dat&0x80) //1000 0000 
 		{
-			digitalWrite(SPI_MOSI,HIGH);//读取的这一位数字是1
+			digitalWrite(LCD_SPI_MOSI,HIGH);//读取的这一位数字是1
 		}
 		else 
 		{
-			digitalWrite(SPI_MOSI,LOW);//读取的这一位数字是0
+			digitalWrite(LCD_SPI_MOSI,LOW);//读取的这一位数字是0
 		} 
-		digitalWrite(SPI_SCK,LOW);
+		digitalWrite(LCD_SPI_SCK,LOW);
 		dat = dat << 1; 
-		digitalWrite(SPI_SCK,HIGH);//在时钟上升沿有效读取这一位数字
+		digitalWrite(LCD_SPI_SCK,HIGH);//在时钟上升沿有效读取这一位数字
 	} 
 	digitalWrite(SPI_CS,HIGH);
 }

@@ -25,8 +25,8 @@ Date       : 06.01.2012
 #endif
 
 // SPI Interface --- (using Arduino Digital Pin 2,3,4,5,6)
-#define SPI_SCK 2     //Serial Clock(Master Output)
-#define SPI_MOSI 3   //Master Output,Slave Input
+#define LCD_SPI_SCK 2     //Serial Clock(Master Output)
+#define LCD_SPI_MOSI 3   //Master Output,Slave Input
 #define LCD_DC  4   //Data/Command(command active low)
 #define SPI_CS  5  //Chip Select,Slave Transmit Enable(active low,Master Output)
 #define LCD_RST 6 //One Reset button
