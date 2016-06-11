@@ -56,14 +56,22 @@ int switchVoltage ;   // From Analog read of the button resistors
 //vypisovani verbatim toho co se zapisuje do souboru na seriak
 const bool serial_print = 1;
 
+//#define SLOW
+#ifdef SLOW
 dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
-
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV16;
 const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV16;
 const byte SPI_CLOCK_SD = SPI_CLOCK_DIV16;
 const unsigned long WIRE_ACC_FREQ = 100000;//400000
 const unsigned long WIRE_RTC_FREQ = 100000;
-
+#else
+dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
+const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV4;
+const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV2;
+const byte SPI_CLOCK_SD = SPI_CLOCK_DIV2;
+const unsigned long WIRE_ACC_FREQ = 400000;//400000
+const unsigned long WIRE_RTC_FREQ = 100000;
+#endif
 
 /*
 In [5]: (1024**2)/8/6/3200
@@ -92,7 +100,7 @@ void reconf(bool spi)
   datarate = conf_datarate;
 
   if (!spi)
-    datarate = max(ADXL345_DATARATE_800_HZ, datarate);
+    datarate = min(ADXL345_DATARATE_800_HZ, datarate);
   
   samplesize = 3*2;
 
@@ -113,6 +121,7 @@ void reconf(bool spi)
 
 
 
+//#define newspi
 #ifdef newspi
 void spi_ram_start()
 {
@@ -500,8 +509,10 @@ bool do_wait = true;
 bool init_acc(Acc &acc)
 {
 
-  Wire.setClock(WIRE_ACC_FREQ);
-  spi_acc_start();
+  if(acc._i2c)
+    Wire.setClock(WIRE_ACC_FREQ);
+  else
+    spi_acc_start();
   
   if(!acc.begin())
   {
@@ -520,10 +531,7 @@ bool init_acc(Acc &acc)
 void test_acc(bool spi)
 {
   just_print = true;
-  if(spi)
-    acquire_acc_spi();
-  else
-    acquire_acc_twi();
+  acquire_acc(spi);
   just_print = false;
 }
   
@@ -540,20 +548,22 @@ const byte MB = 1 << 6;
 
 
 
-void acquire_acc_spi()
+void acquire_acc(bool spi)
 {
-
-  Serial.println(F("spi acquire\n"));  
-  Acc acc = Acc(csacc);
+  if (spi)
+  {
+    Serial.println(F("spi acquire\n"));  
+    Acc acc = Acc(csacc);
   acquire(acc);
-}
 
-void acquire_acc_twi()
-{
-
-  Serial.println(F("i2c acquire\n"));  
-  Acc acc = Acc();
+  }
+  else
+  {
+    Serial.println(F("i2c acquire\n"));  
+    Acc acc = Acc();
   acquire(acc);
+
+  }
 }
 
 
@@ -579,7 +589,8 @@ void acquire(Acc &acc)
   do_wait = true;
   Serial.print(F("start: "));
   Serial.println(now_string());
-  spi_acc_start();
+  if(use_spi)
+    spi_acc_start();
   acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
   spi_end();
   address = 0;
@@ -643,9 +654,9 @@ void acc_read(void)
       else
       {
         Wire.beginTransmission(ADXL345_ADDRESS);
-        Wire.write(ADXL345_REG_DATAX0);
+        Wire.write(ADXL345_REG_DATAX0 | MB);
         Wire.endTransmission();
-        Wire.requestFrom(ADXL345_ADDRESS, 1);
+        Wire.requestFrom(ADXL345_ADDRESS, 8);
         for (int a = 0; a < 6; a++)
             buf[a] = Wire.read();
         Wire.read();
@@ -739,7 +750,6 @@ void sd_out()
   rtc_read(w_start_tm);
   time_t w_start_time = makeTime(w_start_tm);
 
-  spi_sd_start();
   
   Serial.print(F("ok..")); 
   SDClass sd;
@@ -883,6 +893,7 @@ void sd_out()
 
   }
   file.flush();
+  file.close();
   sd.end();
   
   spi_end();
@@ -933,6 +944,10 @@ void dbg_simple_ram_read()
 
 void test_sd(void)
 {
+
+
+//  spi_sd_start();
+
   Sd2Card card;
 
 
@@ -999,9 +1014,9 @@ void test_sd(void)
 
   // list all files in the card with date and size
   root.ls(LS_DATE | LS_SIZE);
-
+  root.close();
   }
-
+  spi_end();
 }
 
 
@@ -1120,6 +1135,7 @@ void setup(void)
   pinMode(csram, 1);
   pinMode(cssd, 1);
   pinMode(csacc, 1);
+  pinMode(LCD_BACKLIGHT_PIN, OUTPUT);
 
   Serial.begin(115200);
   divider();
@@ -1127,20 +1143,15 @@ void setup(void)
   divider();
    
   clear_i2c();
- 
-/*  SPI.setClockDivider(SPI_CLOCK_DIV2);
-  SPI.setDataMode(SPI_MODE0);  */
-
-  SPI.begin();
   init_ram();
 }
 
 
 
-void m_spi_acquire()
+void m_acquire(bool spi)
 {
   divider();
-  acquire_acc_spi();
+  acquire_acc(spi);
   sd_out();
   list_files();
 }
@@ -1279,6 +1290,7 @@ while(true)
 "s - SPI accelerometer test\n"
 "i - I2C accelerometer test\n"
 "r - run (SPI)\n"
+"2 - run (I2C)\n"
 "l - lcd test\n"
 "o - loop spi acquire\n"
 
@@ -1303,11 +1315,14 @@ while(true)
       test_acc(false);
     break;
     case 'r':
-      m_spi_acquire();
+      m_acquire(true);
+    break;
+    case '2':
+      m_acquire(false);
     break;
     case 'o':
       while(true)
-        m_spi_acquire();
+        m_acquire(true);
     break;
     case 'l':
       lcd_test();
