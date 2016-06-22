@@ -5,6 +5,7 @@
 #include <Time.h>
 #include <DS1307RTC.h>
 #include "SRAM.h"
+#include "OMMenuMgr.h"
 
 
 
@@ -58,14 +59,14 @@ const bool serial_print = 1;
 
 //#define SLOW
 #ifdef SLOW
-dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
+dataRate_t conf_datarate = ADXL345_DATARATE_100_HZ;//1600,800,400..
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV16;
 const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV16;
-const byte SPI_CLOCK_SD = SPI_CLOCK_DIV16;
+const byte SPI_CLOCK_SD = SPI_CLOCK_DIV16;//probably not effective
 const unsigned long WIRE_ACC_FREQ = 100000;//400000
-const unsigned long WIRE_RTC_FREQ = 100000;
+const unsigned long WIRE_RTC_FREQ = 100000; 
 #else
-dataRate_t conf_datarate = ADXL345_DATARATE_800_HZ;//1600,800,400..
+dataRate_t conf_datarate = ADXL345_DATARATE_400_HZ;//1600,800,400..
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV4;
 const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV2;
 const byte SPI_CLOCK_SD = SPI_CLOCK_DIV2;
@@ -121,7 +122,7 @@ void reconf(bool spi)
 
 
 
-//#define newspi
+#define newspi
 #ifdef newspi
 void spi_ram_start()
 {
@@ -1144,6 +1145,7 @@ void setup(void)
    
   clear_i2c();
   init_ram();
+  lcd.LCD_init(); // creates instance of LCD
 }
 
 
@@ -1193,47 +1195,144 @@ Serial.println(F("selftest done"));
 
 
 
+ // which input is our button
+const byte BUT_PIN = 14;
+
+  // analog button read values
+const int BUTSEL_VAL  = 70;
+const int BUTFWD_VAL  = 250;
+const int BUTREV_VAL  = 450;
+const int BUTDEC_VAL  = 655;
+const int BUTINC_VAL  = 830;
+
+const byte BUT_THRESH  = 60;
 
 
+  // mapping of analog button values for menu
+int BUT_MAP[5][2] = {
+                         {BUTFWD_VAL, BUTTON_FORWARD}, 
+                         {BUTINC_VAL, BUTTON_INCREASE}, 
+                         {BUTDEC_VAL, BUTTON_DECREASE}, 
+                         {BUTREV_VAL, BUTTON_BACK}, 
+                         {BUTSEL_VAL, BUTTON_SELECT} 
+                    };
+                            
+
+
+// ====== Test Menu =========== 
+
+byte foo = 0;
+byte sel = 0;
+unsigned int bar = 1;
+long baz  = 0;
+float bak = 0.0;
+
+  // Create a list of states and values for a select input
+MENU_SELECT_ITEM  sel_ign = { 2, {"Ignore"} };
+MENU_SELECT_ITEM  sel_on  = { 1, {"On"} };
+MENU_SELECT_ITEM  sel_off = { 0, {"Off"} };
+
+MENU_SELECT_LIST  state_list[] = { &sel_ign, &sel_on, &sel_off };
+                                  
+  // the special target for our state input
+  
+                             // TARGET VAR   LENGTH                          TARGET SELECT LIST
+MENU_SELECT state_select = { &sel,           MENU_SELECT_SIZE(state_list),   MENU_TARGET(&state_list) };
+
+  // values to use 
+
+                    //    TYPE            MAX    MIN    TARGET 
+MENU_VALUE foo_value = { TYPE_BYTE,       100,   0,     MENU_TARGET(&foo) };
+MENU_VALUE bar_value = { TYPE_UINT,       10000, 100,   MENU_TARGET(&bar) };
+MENU_VALUE baz_value = { TYPE_LONG,       10000, 1,     MENU_TARGET(&baz) };
+MENU_VALUE bak_value = { TYPE_FLOAT_1000, 0,     0,     MENU_TARGET(&bak) };
+MENU_VALUE sel_value = { TYPE_SELECT,     0,     0,     MENU_TARGET(&state_select) };
+
+                    //        LABEL           TYPE        LENGTH    TARGET
+MENU_ITEM item_checkme  = { {"Byte Edit"},    ITEM_VALUE,  0,        MENU_TARGET(&foo_value) };
+MENU_ITEM item_barme    = { {"UInt Edit"},     ITEM_VALUE,  0,        MENU_TARGET(&bar_value) };
+MENU_ITEM item_bazme    = { {"Long Edit"},    ITEM_VALUE,  0,        MENU_TARGET(&baz_value) };
+MENU_ITEM item_bakme    = { {"Float Edit"},   ITEM_VALUE,  0,        MENU_TARGET(&bak_value) };
+MENU_ITEM item_state    = { {"Select Input"}, ITEM_VALUE,  0,        MENU_TARGET(&sel_value) };
+MENU_ITEM item_testme   = { {"Test Action"},  ITEM_ACTION, 0,        MENU_TARGET(uiQwkScreen) };
+
+                   //        List of items in menu level
+MENU_LIST root_list[]   = { &item_checkme, &item_barme, &item_bazme, &item_bakme, &item_state, &item_testme };
+
+                  // Root item is always created last, so we can add all other items to it
+MENU_ITEM menu_root     = { {"Root"},        ITEM_MENU,   MENU_SIZE(root_list),    MENU_TARGET(&root_list) };
+
+
+OMMenuMgr Menu(&menu_root);
+
+
+void testAction() {
+ digitalWrite(LCD_BACKLIGHT_PIN, 0);
+ delay(100);
+ digitalWrite(LCD_BACKLIGHT_PIN, 1);  
+}
+
+void uiQwkScreen() {/*
+  lcd.clear();
+  Menu.enable(false);
+  
+  lcd.print("Action!");
+  lcd.setCursor(0, 1);
+  lcd.print("Enter 2 return");
+  
+  while( Menu.checkInput() != BUTTON_SELECT ) {
+    ; // wait!
+  }
+  
+  Menu.enable(true);
+  lcd.clear();*/
+}  
+
+
+void uiDraw(char* text, int row, int col/*, int len*/) {
+    lcd.LCD_write_string(row, col, text, MENU_NORMAL); // ignore MENU_NORMAL for now
+}
+
+
+void uiClear() {
+  
+  lcd.LCD_clear(); // blanks the display
+  lcd.print("Enter for Menu");
+}
 
 
 void lcd_test()
 {
-  pinMode(LCD_BACKLIGHT_PIN, OUTPUT);
-  lcd.LCD_init(); // creates instance of LCD
-  lcd.LCD_clear(); // blanks the display
-  for (int a = 0; a < 5; a++)
-  {
-    digitalWrite(LCD_BACKLIGHT_PIN, LOW);
-    delay(300);
-    digitalWrite(LCD_BACKLIGHT_PIN, HIGH);
-    delay(300);
-  }
-  for (int a = 0; a < 6; a++)
-  {
-    lcd.LCD_write_string(0, a, "01234567980123", MENU_NORMAL); // ignore MENU_NORMAL for now
-    delay(displayDelay);
-  }
-  delay(displayDelay);
-  lcd.LCD_clear();   // blanks the display
-  delay(500);
-  // Show the BIG characters (0..9, + - only)
-  lcd.LCD_write_string_big(0, 0, "012345", MENU_NORMAL);
-  lcd.LCD_write_string_big(0, 3, "-+-+-+", MENU_NORMAL);
-  delay(1000);
-  lcd.LCD_clear();  // now  read the joystick using analogRead(0
 
-//--(end setup )---
+  
+  Menu.setDrawHandler(uiDraw);
+  Menu.setExitHandler(uiClear);
+  Menu.setAnalogButtonPin(BUT_PIN, BUT_MAP, BUT_THRESH);
+  Menu.enable(true); 
+
+  
+  lcd.LCD_clear(); // blanks the display
+  digitalWrite(LCD_BACKLIGHT_PIN, HIGH);
+
+//  lcd.LCD_write_string_big(0, 0, "012345", MENU_NORMAL);
 
 
 while(true)
 {
+
+
+ Menu.checkInput();
+
+
+
+  /*
   lcd.LCD_write_string(1, 1, "PUSH A BUTTON", MENU_NORMAL);
   delay(1000);
   switchVoltage = analogRead(0);
   Serial.print("Switch analog value = ");
   Serial.println(switchVoltage);
 
+  
   if (switchVoltage == 0)
   {
     lcd.LCD_write_string(2, 2, "LEFT ", MENU_NORMAL);
@@ -1261,8 +1360,9 @@ while(true)
   else if (switchVoltage > 800)              {
     lcd.LCD_write_string(2, 2, "NONE    ", MENU_NORMAL);
     delay(switchDelay);
+  }*/
+  
   }
-}
 }
 
 
