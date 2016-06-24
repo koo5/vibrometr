@@ -37,11 +37,11 @@
 
 
 #ifndef OM_MENU_ROWS
-    #define OM_MENU_ROWS    2
+    #define OM_MENU_ROWS    5
 #endif
 
 #ifndef OM_MENU_COLS
-    #define OM_MENU_COLS    16
+    #define OM_MENU_COLS    14
 #endif
 
 #ifndef OM_MENU_LBLLEN
@@ -74,16 +74,22 @@
 
 
 
-#define MENU_ITEM           PROGMEM OMMenuItem
-#define MENU_LIST           PROGMEM OMMenuItem*
-#define MENU_VALUE          PROGMEM OMMenuValue
+//#define MENU_ITEM           PROGMEM OMMenuItem
+//#define MENU_LIST           PROGMEM OMMenuItem*
+//#define MENU_VALUE          PROGMEM OMMenuValue
+#define MENU_ITEM           OMMenuItem const PROGMEM
+#define MENU_LIST           const OMMenuItem* const PROGMEM
+#define MENU_VALUE          OMMenuValue const PROGMEM
 #define MENU_FLAG           PROGMEM OMMenuValueFlag
-#define MENU_SELECT_ITEM    PROGMEM OMMenuSelectListItem
-#define MENU_SELECT_LIST    PROGMEM OMMenuSelectListItem*
-#define MENU_SELECT         PROGMEM OMMenuSelectValue
+//#define MENU_SELECT_ITEM    PROGMEM OMMenuSelectListItem
+//#define MENU_SELECT_LIST    PROGMEM OMMenuSelectListItem*
+//#define MENU_SELECT         PROGMEM OMMenuSelectValue
+#define MENU_SELECT_ITEM    OMMenuSelectListItem const PROGMEM
+#define MENU_SELECT_LIST    const OMMenuSelectListItem* const PROGMEM
+#define MENU_SELECT         OMMenuSelectValue const PROGMEM
 #define MENU_SELECT_SIZE(x) sizeof(x) / sizeof(OMMenuSelectListItem*)
 #define MENU_SIZE(x)        sizeof(x) / sizeof(OMMenuItem*)
-#define MENU_TARGET(x)      reinterpret_cast<void*>(x)
+#define MENU_TARGET(x)      reinterpret_cast<const void*>(x)
 
 
 /** Select-Type Item
@@ -92,7 +98,7 @@
  */
 struct OMMenuSelectListItem {
     uint8_t   value;
-    prog_char label[OM_MENU_LBLLEN];
+    const char label[OM_MENU_LBLLEN];
 };
 
 
@@ -105,7 +111,7 @@ struct OMMenuSelectValue {
     uint8_t* targetValue;
     uint8_t listCount;
         /** Void Pointer to list of select items (OMMenuSelectListItem**) */
-    void* list;
+    const void* list;
 };
 
 
@@ -138,10 +144,10 @@ struct OMMenuValueFlag {
  */
 
 struct OMMenuItem {
-    prog_char     label[OM_MENU_COLS];
+    const char    label[OM_MENU_COLS];
     uint8_t       type;
     uint8_t       targetCount;
-    void*         target;
+    const void*   target;
 };
 
 
@@ -157,7 +163,7 @@ struct OMMenuValue {
     uint8_t type;
     long    max;
     long    min;
-    void*   targetValue;
+    const void*   targetValue;
     int     eepromLoc;
 };
 
@@ -912,7 +918,7 @@ class OMMenuMgr {
 
 public:
 
-    OMMenuMgr(OMMenuItem* c_first, uint8_t c_type = MENU_ANALOG);
+    OMMenuMgr(const OMMenuItem* c_first, uint8_t c_type = MENU_ANALOG);
 
     void setAnalogButtonPin(uint8_t p_pin, const int p_values[5][2], int p_thresh);
     void setDigitalButtonPins(const int p_pins[5][2]);
@@ -942,7 +948,7 @@ private:
     int            m_anaThresh;
     bool           m_enable;
     bool           m_inEdit;
-    bool           m_menuActive;
+    bool           m_menuActive=true;
     bool           m_forceReturn;
     OMMenuItem*    m_curSel;
     OMMenuItem*    m_curParent;

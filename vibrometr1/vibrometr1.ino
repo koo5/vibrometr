@@ -299,30 +299,6 @@ void clear_i2c() {
 
 
 
-
-bool rtc_auto_set(void)
-{
-  tmElements_t tm;
-  tm.Second = tm.Minute = tm.Hour = tm.Day = tm.Month = tm.Year = 1;
-
-    if (RTC.write(tm))
-    {
-      Serial.println(F("time set."));
-      /*Serial.print(F("DS1307 configured Time="));
-      Serial.print(__TIME__);
-      Serial.print(F(", Date="));
-      Serial.println(F(__DATE__));*/
-      return true;
-    }
-    else
-    {
-      Serial.println(F("rtc err"));
-      return false;
-    }
-}
-
-
-
 String now_string(void)
 {
   tmElements_t tm;
@@ -334,8 +310,6 @@ String now_string(void)
     if (RTC.chipPresent())
     {
       Serial.println(F("RTC stopped. please set time."));
-      if(rtc_auto_set())
-        return now_string();
     }
     else
     {
@@ -570,7 +544,7 @@ void acquire_acc(bool spi)
 
 void acquire(Acc &acc)
 {
-
+/*
   reconf(!acc._i2c);
 
   
@@ -600,12 +574,12 @@ void acquire(Acc &acc)
   
   rtc_read(end_tm);
   Serial.print(F("end: "));   Serial.println(time_string(end_tm));
-  
+  */
 }
 
 
 void acc_wait(void)
-{
+{/*
   byte entries;
   do
   {
@@ -631,12 +605,13 @@ void acc_wait(void)
     entries = status & 0b111111;
   }
   while(!entries);
+  */
 }
 
 
 
 void acc_read(void)
-{    
+{   /* 
       char buf[6];
       byte entries = 123;
       byte status ;
@@ -696,7 +671,7 @@ void acc_read(void)
       }
   
       address += 6;
-     
+  */   
 }
 
 
@@ -745,6 +720,8 @@ void w_timing_end(time_t w_start_time)
 
 void sd_out()
 {
+
+  
   now_string();//init
 
   tmElements_t w_start_tm, w_end_tm;
@@ -815,8 +792,8 @@ void sd_out()
       {
         Serial.print(F("address:"));
         Serial.print(address);
-        /*Serial.print(F("sib * samplesize:"));
-        Serial.print(sib * samplesize);*/    
+        //Serial.print(F("sib * samplesize:"));
+        //Serial.print(sib * samplesize);
         Serial.print(F(".."));
   
         rtc_read(w_end_tm);
@@ -830,15 +807,6 @@ void sd_out()
     for (s = 0; s < sib; s+=2)
     {
 
-/*
-      Serial.print(F("sib:"));
-      Serial.print(sib);
-      Serial.print(F("s:"));
-      Serial.print(s);
-      Serial.print(F("bufpos:"));
-      Serial.print(bufpos);
-      Serial.println(F(".."));
-*/
 
       /*
      if (ticks_check)
@@ -945,7 +913,7 @@ void dbg_simple_ram_read()
 
 void test_sd(void)
 {
-
+/*
 
 //  spi_sd_start();
 
@@ -1018,6 +986,8 @@ void test_sd(void)
   root.close();
   }
   spi_end();
+
+  */
 }
 
 
@@ -1132,6 +1102,7 @@ void setup(void)
   digitalWrite(csram, 1);
   digitalWrite(cssd, 1);
   digitalWrite(csacc, 1);  
+  digitalWrite(LCD_BACKLIGHT_PIN, 0);
   
   pinMode(csram, 1);
   pinMode(cssd, 1);
@@ -1195,15 +1166,16 @@ Serial.println(F("selftest done"));
 
 
 
+
  // which input is our button
 const byte BUT_PIN = 14;
 
   // analog button read values
-const int BUTSEL_VAL  = 70;
-const int BUTFWD_VAL  = 250;
-const int BUTREV_VAL  = 450;
-const int BUTDEC_VAL  = 655;
-const int BUTINC_VAL  = 830;
+const int BUTSEL_VAL  = 163;
+const int BUTFWD_VAL  = 525;
+const int BUTREV_VAL  = 14;
+const int BUTDEC_VAL  = 351;
+const int BUTINC_VAL  = 756;
 
 const byte BUT_THRESH  = 60;
 
@@ -1219,20 +1191,22 @@ int BUT_MAP[5][2] = {
                             
 
 
-// ====== Test Menu =========== 
-
 byte foo = 0;
 byte sel = 0;
 unsigned int bar = 1;
 long baz  = 0;
 float bak = 0.0;
 
+
+
+
+
   // Create a list of states and values for a select input
 MENU_SELECT_ITEM  sel_ign = { 2, {"Ignore"} };
 MENU_SELECT_ITEM  sel_on  = { 1, {"On"} };
 MENU_SELECT_ITEM  sel_off = { 0, {"Off"} };
 
-MENU_SELECT_LIST  state_list[] = { &sel_ign, &sel_on, &sel_off };
+MENU_SELECT_LIST state_list[] = { &sel_ign, &sel_on, &sel_off };
                                   
   // the special target for our state input
   
@@ -1255,7 +1229,7 @@ MENU_ITEM item_bazme    = { {"Long Edit"},    ITEM_VALUE,  0,        MENU_TARGET
 MENU_ITEM item_bakme    = { {"Float Edit"},   ITEM_VALUE,  0,        MENU_TARGET(&bak_value) };
 MENU_ITEM item_state    = { {"Select Input"}, ITEM_VALUE,  0,        MENU_TARGET(&sel_value) };
 MENU_ITEM item_testme   = { {"Test Action"},  ITEM_ACTION, 0,        MENU_TARGET(uiQwkScreen) };
-
+      
                    //        List of items in menu level
 MENU_LIST root_list[]   = { &item_checkme, &item_barme, &item_bazme, &item_bakme, &item_state, &item_testme };
 
@@ -1289,20 +1263,32 @@ void uiQwkScreen() {/*
 }  
 
 
-void uiDraw(char* text, int row, int col/*, int len*/) {
-    lcd.LCD_write_string(row, col, text, MENU_NORMAL); // ignore MENU_NORMAL for now
+void uiDraw(char* text, int row, int col, int len) {
+  Serial.print(row);Serial.print(' '); Serial.print(col); Serial.print(':');
+lcd.LCD_set_XY(col*8, row);
+  for( int i = 0; i < len; i++ ) {
+    char ch = text[i];
+    if( ch < '!' || ch > '~' ) ch = ' ';
+    lcd.LCD_write_char(ch, MENU_NORMAL);
+    Serial.print(ch);
+  }
+  Serial.println('.');
 }
 
 
 void uiClear() {
   
   lcd.LCD_clear(); // blanks the display
-  lcd.print("Enter for Menu");
+  uiDraw("Enter for Menu",0,0,5);
 }
 
 
 void lcd_test()
 {
+
+
+  lcd.LCD_clear(); // blanks the display
+  digitalWrite(LCD_BACKLIGHT_PIN, HIGH);
 
   
   Menu.setDrawHandler(uiDraw);
@@ -1311,58 +1297,50 @@ void lcd_test()
   Menu.enable(true); 
 
   
-  lcd.LCD_clear(); // blanks the display
-  digitalWrite(LCD_BACKLIGHT_PIN, HIGH);
 
 //  lcd.LCD_write_string_big(0, 0, "012345", MENU_NORMAL);
 
 
 while(true)
 {
-
-
- Menu.checkInput();
-
-
-
-  /*
-  lcd.LCD_write_string(1, 1, "PUSH A BUTTON", MENU_NORMAL);
-  delay(1000);
-  switchVoltage = analogRead(0);
+  /*switchVoltage = analogRead(0);
   Serial.print("Switch analog value = ");
-  Serial.println(switchVoltage);
+  Serial.println(switchVoltage);*/
 
   
+  /*
   if (switchVoltage == 0)
   {
-    lcd.LCD_write_string(2, 2, "LEFT ", MENU_NORMAL);
+    b = BUTTON_BACK;
   }
-  else if (switchVoltage > 0 && switchVoltage < 180)
+  else if (switchVoltage < 180)
   {
-    lcd.LCD_write_string(2, 2, "PUSH IN", MENU_NORMAL);
-    delay(switchDelay);
+    b = BUTTON_SELECT;
+
   }
-  else if (switchVoltage > 180 && switchVoltage < 400)
+  else if (switchVoltage < 400)
   {
-    lcd.LCD_write_string(2, 2, "DOWN ", MENU_NORMAL);
-    delay(switchDelay);
+    b = BUTTON_DECREASE;
+    
   }
-  else if (switchVoltage > 400 && switchVoltage < 600)
+  else if (switchVoltage < 600)
   {
-    lcd.LCD_write_string(2, 2, "RIGHT", MENU_NORMAL);
-    delay(switchDelay);
-  }
+    b = BUTTON_FORWARD;
+      }
   else if (switchVoltage > 600 && switchVoltage < 800)
   {
-    lcd.LCD_write_string(2, 2, "UP   ", MENU_NORMAL);
-    delay(switchDelay);
+    b = BUTTON_INCREASE;
   }
   else if (switchVoltage > 800)              {
-    lcd.LCD_write_string(2, 2, "NONE    ", MENU_NORMAL);
-    delay(switchDelay);
-  }*/
-  
+    b = BUTTON_NONE;
   }
+
+  Serial.print("b = ");Serial.println(b);
+  */
+  byte b = Menu.checkInput();
+  if (b)
+    Serial.println(b);
+}
 }
 
 
@@ -1373,7 +1351,7 @@ while(true)
 
 void menu()
 {
-  char i = 'h';
+  char i = 'l';
   
 while(true)
 {
