@@ -55,7 +55,7 @@ OMMenuMgr::OMMenuMgr(const OMMenuItem* c_first, uint8_t c_type) {
     m_rootItem   = const_cast<OMMenuItem*>(c_first);
     m_inEdit     = false;
     m_enable     = true;
-    m_menuActive = true;
+    m_menuActive = false;
     m_curSel     = 0;
     m_draw       = 0;
     m_exit       = 0;
@@ -268,6 +268,16 @@ uint8_t OMMenuMgr::checkInput() {
         return key;
     }
 
+
+
+
+
+
+
+
+
+
+
         // if the menu hasn't been drawn, ignore
         // interaction features
 
@@ -282,9 +292,8 @@ uint8_t OMMenuMgr::checkInput() {
         // the rate at which numbers go up/down to increase
 
     if( key == holdKey ) {
-
         held++;
-        if( held % 10 )
+        if( !(held % 4) )
             m_holdMod += 2;
     }
     else {
@@ -293,7 +302,11 @@ uint8_t OMMenuMgr::checkInput() {
     }
 
 
-    _handleButton(key);
+    if(!held || held > 5)
+	    _handleButton(key);
+
+
+	Serial.println(held);
 
     return key;
 

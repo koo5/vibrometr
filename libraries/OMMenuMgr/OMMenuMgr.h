@@ -53,7 +53,7 @@
 #endif
 
 #ifndef OM_MENU_DEBOUNCE
-    #define OM_MENU_DEBOUNCE 120
+    #define OM_MENU_DEBOUNCE 60
 #endif
 
 #ifndef OM_MENU_CURSOR
@@ -90,6 +90,23 @@
 #define MENU_SELECT_SIZE(x) sizeof(x) / sizeof(OMMenuSelectListItem*)
 #define MENU_SIZE(x)        sizeof(x) / sizeof(OMMenuItem*)
 #define MENU_TARGET(x)      reinterpret_cast<const void*>(x)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /** Select-Type Item
@@ -913,6 +930,32 @@ void uiQwkScreen() {
 
 */
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class OMMenuMgr {
 
 
@@ -937,6 +980,19 @@ public:
 
     unsigned int holdModifier();
 
+
+
+
+
+
+    void        _handleButton(uint8_t p_key);
+    bool           m_menuActive;
+
+
+
+
+
+
 private:
 
     typedef void(*f_valueHandler)();
@@ -948,7 +1004,6 @@ private:
     int            m_anaThresh;
     bool           m_enable;
     bool           m_inEdit;
-    bool           m_menuActive=true;
     bool           m_forceReturn;
     OMMenuItem*    m_curSel;
     OMMenuItem*    m_curParent;
@@ -969,7 +1024,6 @@ private:
 
     int         _checkAnalog();
     int         _checkDigital();
-    void        _handleButton(uint8_t p_key);
     void        _activate(OMMenuItem* p_item, bool p_return = false);
     void        _edit(OMMenuItem* p_item, uint8_t p_type);
     void        _displayList(OMMenuItem* p_item, uint8_t p_target = 0);

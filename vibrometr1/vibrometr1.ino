@@ -1263,23 +1263,33 @@ void uiQwkScreen() {/*
 }  
 
 
-void uiDraw(char* text, int row, int col, int len) {
+void uiDraw(char* text, int row, int col, int len=0) {
   Serial.print(row);Serial.print(' '); Serial.print(col); Serial.print(':');
 lcd.LCD_set_XY(col*8, row);
-  for( int i = 0; i < len; i++ ) {
-    char ch = text[i];
-    if( ch < '!' || ch > '~' ) ch = ' ';
-    lcd.LCD_write_char(ch, MENU_NORMAL);
-    Serial.print(ch);
-  }
-  Serial.println('.');
+
+    int i = 0; 
+    while(true)
+    {
+      char ch = text[i];
+
+      
+      if ((!len && !ch)
+        ||
+        ( i >= len))
+        break;
+      i++;
+      if( ch < '!' || ch > '~' ) ch = ' ';
+      lcd.LCD_write_char(ch, MENU_NORMAL);
+      Serial.print(ch);
+    }
+    Serial.println('.');
 }
 
 
 void uiClear() {
   
   lcd.LCD_clear(); // blanks the display
-  uiDraw("Enter for Menu",0,0,5);
+  uiDraw("Push Select for Menu",0,0);
 }
 
 
@@ -1296,54 +1306,18 @@ void lcd_test()
   Menu.setAnalogButtonPin(BUT_PIN, BUT_MAP, BUT_THRESH);
   Menu.enable(true); 
 
-  
-
-//  lcd.LCD_write_string_big(0, 0, "012345", MENU_NORMAL);
-
+  Menu.m_menuActive = true;
+  Menu._handleButton(BUTTON_SELECT);
 
 while(true)
 {
-  /*switchVoltage = analogRead(0);
-  Serial.print("Switch analog value = ");
-  Serial.println(switchVoltage);*/
-
-  
-  /*
-  if (switchVoltage == 0)
-  {
-    b = BUTTON_BACK;
-  }
-  else if (switchVoltage < 180)
-  {
-    b = BUTTON_SELECT;
-
-  }
-  else if (switchVoltage < 400)
-  {
-    b = BUTTON_DECREASE;
-    
-  }
-  else if (switchVoltage < 600)
-  {
-    b = BUTTON_FORWARD;
-      }
-  else if (switchVoltage > 600 && switchVoltage < 800)
-  {
-    b = BUTTON_INCREASE;
-  }
-  else if (switchVoltage > 800)              {
-    b = BUTTON_NONE;
-  }
-
-  Serial.print("b = ");Serial.println(b);
-  */
   byte b = Menu.checkInput();
   if (b)
     Serial.println(b);
 }
 }
 
-
+                           
 
 
 
@@ -1426,4 +1400,12 @@ data zapisujte do SRAM a pak do souboru. Behem tohoto cyklu do terminalu vypisuj
 A na konci vysledek, OK, error, kde a jaky byl error apod.
 >*/
 //Myslel jsem tim jen aby to nebezelo samo porad dokola. Cim vice to rozkouskujete, tim take lepe, abych mohl otestovat jednotlive casti samostatne. To cele byla idea nad menu. Kdyz menu nejak pozmenite, aby lepe pasovalo k tomu jak mate usporadany jednotlive funkce v SW, tim lepe. Dulezite je menu, vyber fuknce, provedeni akce a zase ukonceni v menu a cekani na dalsi pokyn.
+/*
+(2) Dokoncete I2C pristup od ADXL - nastaveni, cteni dat
 
+(3) Oprava a pripadne zmenseni kodu okolo SD karty, aby to dobre cetlo i zapisovalo soubory
+
+(4) LCD display a menu nastavovani. Mne uz LCD moduly (pro jistotu jsem si koupil 2) dorazily minuly tyden, uz je take mate ?
+Tady udelejete prosim alespon nastavovani realneho casu, nastavovani parametru naberu dat z ADXL (dobu sberu dat, vzorkovaci frekvenci) a pak sem prevedte testovaci menu. Do menu pridejte jeste moznost zaobrazovani realneho casu. Aby to cele vypadalo jako hodiny s datumem.
+Nemame klavesnici, tedy u vseho spise pujde o vyber parametru k nastaveni a pak "joystickem" pohybem nahoru a dolu vyber hodnot a pak potvrzeni, napr. stiskem stredu "joysticku". Tim se nastavena hodnota ulozi a vrati se v menu o stupen vyse.
+*/
