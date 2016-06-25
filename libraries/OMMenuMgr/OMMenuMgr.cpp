@@ -427,7 +427,7 @@ int OMMenuMgr::_checkDigital() {
 
 
 void OMMenuMgr::_display(char* p_str, int p_row, int p_col, int p_count) {
-    if( m_draw != 0 )
+ //   if( m_draw != 0 )
         m_draw(p_str, p_row, p_col, p_count);
 }
 
@@ -656,7 +656,7 @@ void OMMenuMgr::_displayList(OMMenuItem* p_item, uint8_t p_target) {
     }
 
 }
-
+ 
  // display a value to be edited
 
 void OMMenuMgr::_displayEdit(OMMenuItem* p_item) {
@@ -721,9 +721,10 @@ void OMMenuMgr::_displayEdit(OMMenuItem* p_item) {
         _displayFlagVal();
         return;
     }
+//#ifndef MENUFULL
     else if( type >= TYPE_FLOAT ) // always run as last check
         m_tempF    = *reinterpret_cast<float*>(valPtr);
-
+//#endif
     // throw number on-screen
     _displayVoidNum(valPtr, type, 1, 0);
 

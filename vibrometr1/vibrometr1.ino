@@ -6,6 +6,7 @@
 #include <DS1307RTC.h>
 #include "SRAM.h"
 #include "OMMenuMgr.h"
+#include <LCD4884.h>  
 
 
 
@@ -17,27 +18,6 @@
 
 
 
-/* YourDuinoStarter Example: LCD SHIELD with 'Joystick' button
- - WHAT IT DOES Displays on LCD4884, reads button
- - SEE the comments after "//" on each line below
- - CONNECTIONS:
-   - LCD 4884 Shield has all connections
-   -
-   NOTE: Start Serial Monitor to see switch voltage values
- - V1.00 02/08/2016
-   Questions: terry@yourduino.com */
-
-/*-----( Import needed libraries )-----*/
-#include <LCD4884.h>  // UPDATED version 2/16 Yourduino
-/*-----( Declare Constants and Pin Numbers )-----*/
-#define LCD_BACKLIGHT_PIN  7
-
-/*-----( Declare objects )-----*/
-//None: Included in library
-/*-----( Declare Variables )-----*/
-int displayDelay = 1000;
-int switchDelay  = 100;  // Switch scanning delay
-int switchVoltage ;   // From Analog read of the button resistors
 
 
 
@@ -79,6 +59,7 @@ In [5]: (1024**2)/8/6/3200
 Out[5]: 6.826666666666666*/
 unsigned int conf_duration = 6;
 
+const byte LCD_BACKLIGHT_PIN  = 7;
 
 const byte cssd = 10;
 const byte csacc = 9;
@@ -1191,11 +1172,6 @@ int BUT_MAP[5][2] = {
                             
 
 
-byte foo = 0;
-byte sel = 0;
-unsigned int bar = 1;
-long baz  = 0;
-float bak = 0.0;
 
 
 
@@ -1214,6 +1190,13 @@ MENU_SELECT_LIST state_list[] = { &sel_ign, &sel_on, &sel_off };
 MENU_SELECT state_select = { &sel,           MENU_SELECT_SIZE(state_list),   MENU_TARGET(&state_list) };
 
   // values to use 
+
+
+byte foo = 0;
+byte sel = 0;
+unsigned int bar = 1;
+long baz  = 0;
+float bak = 0.0;
 
                     //    TYPE            MAX    MIN    TARGET 
 MENU_VALUE foo_value = { TYPE_BYTE,       100,   0,     MENU_TARGET(&foo) };
