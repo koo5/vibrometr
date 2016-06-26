@@ -302,7 +302,7 @@ uint8_t OMMenuMgr::checkInput() {
     }
 
 
-    if(!held || held > 5)
+    if(!held || (held > 5 && !(held%4)) )
 	    _handleButton(key);
 
 

@@ -132,7 +132,7 @@ void Acc::setDataRate(dataRate_t dataRate)
 {
   /* Note: The LOW_POWER bits are currently ignored and we always keep
      the device in 'normal' mode */
-  writeRegister(ADXL345_REG_BW_RATE, dataRate);
+  writeRegister(ADXL345_REG_BW_RATE, (byte)dataRate);
 }
 
 /**************************************************************************/
