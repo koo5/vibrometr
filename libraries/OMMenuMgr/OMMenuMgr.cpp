@@ -680,12 +680,20 @@ void OMMenuMgr::_displayEdit(OMMenuItem* p_item) {
         // then use specific bytes.  This takes more memory, but it seems
         // a viable trade
 
+#ifdef fullmenu
     if( type == TYPE_BYTE )
         m_temp     = *reinterpret_cast<uint8_t*>(valPtr);
-    else if( type == TYPE_UINT || type == TYPE_INT )
+    else 
+#endif
+
+    if( type == TYPE_UINT || type == TYPE_INT )
         m_tempI   = *reinterpret_cast<int*>(valPtr);
+
+#ifdef fullmenu
     else if( type == TYPE_LONG || type == TYPE_ULONG )
         m_tempL   = *reinterpret_cast<long*>(valPtr);
+#endif
+
     else if( type == TYPE_SELECT ) {
             // select types are interesting...  We have a list of possible values and
             // labels - we need to work that back to an index in the list...
@@ -721,10 +729,14 @@ void OMMenuMgr::_displayEdit(OMMenuItem* p_item) {
         _displayFlagVal();
         return;
     }
-//#ifndef MENUFULL
+
+
+#ifdef fullmenu
     else if( type >= TYPE_FLOAT ) // always run as last check
         m_tempF    = *reinterpret_cast<float*>(valPtr);
-//#endif
+#endif
+
+
     // throw number on-screen
     _displayVoidNum(valPtr, type, 1, 0);
 
@@ -740,6 +752,8 @@ void OMMenuMgr::_displayVoidNum(void* p_ptr, uint8_t p_type, int p_row, int p_co
     memset(m_dispBuf, ' ', sizeof(char) * sizeof(m_dispBuf));
 
         // handle variable precision for float nums
+#ifdef fullmenu
+
     byte floatPrecision = 1;
 
     if( p_type == TYPE_FLOAT_100 )
@@ -749,8 +763,12 @@ void OMMenuMgr::_displayVoidNum(void* p_ptr, uint8_t p_type, int p_row, int p_co
 
     if( p_type == TYPE_BYTE )
             utoa(*reinterpret_cast<uint8_t*>(p_ptr), m_dispBuf, 10);
-    else if( p_type == TYPE_INT)
+    else 
+#endif
+    if( p_type == TYPE_INT)
             itoa(*reinterpret_cast<int*>(p_ptr), m_dispBuf, 10);
+#ifdef fullmenu
+
     else if( p_type == TYPE_UINT )
             utoa(*reinterpret_cast<unsigned int*>(p_ptr), m_dispBuf, 10);
     else if( p_type == TYPE_LONG)
@@ -759,6 +777,7 @@ void OMMenuMgr::_displayVoidNum(void* p_ptr, uint8_t p_type, int p_row, int p_co
             ultoa(*reinterpret_cast<unsigned long*>(p_ptr), m_dispBuf, 10);
     else if( p_type >= TYPE_FLOAT )
             dtostrf(*reinterpret_cast<float*>(p_ptr), floatPrecision + 2, floatPrecision, m_dispBuf);
+#endif
 
     _display(m_dispBuf, p_row, p_col, sizeof(char) * sizeof(m_dispBuf));
 
@@ -778,6 +797,8 @@ void OMMenuMgr::_modifyTemp(uint8_t p_type, uint8_t p_mode, long p_min, long p_m
         // handle float precision adjustment
     float fmod = (float) mod;
 
+#ifdef fullmenu
+
     if( p_type == TYPE_FLOAT_10 )
         fmod /= 10.0;
     else if( p_type == TYPE_FLOAT_100 )
@@ -795,12 +816,19 @@ void OMMenuMgr::_modifyTemp(uint8_t p_type, uint8_t p_mode, long p_min, long p_m
             m_temp = m_temp > p_max ? p_max : ( m_temp < p_min ? p_min : m_temp );
         tempNum = reinterpret_cast<void*>(&m_temp);
     }
-    else if( p_type == TYPE_INT ) {
+    else 
+    
+#endif
+    
+    if( p_type == TYPE_INT ) {
         m_tempI += mod;
         if( p_min != 0 || p_max != 0 )
             m_tempI = m_tempI > p_max ? p_max : ( m_tempI < p_min ? p_min : m_tempI );
         tempNum = reinterpret_cast<void*>(&m_tempI);
     }
+
+#ifdef fullmenu
+
     else if( p_type == TYPE_UINT ) {
         *reinterpret_cast<unsigned int*>(&m_tempI) += mod;
         if( p_min != 0 || p_max != 0 )
@@ -825,6 +853,7 @@ void OMMenuMgr::_modifyTemp(uint8_t p_type, uint8_t p_mode, long p_min, long p_m
             m_tempF = m_tempF > p_max ? p_max : ( m_tempF < p_min ? p_min : m_tempF );
         tempNum = reinterpret_cast<void*>(&m_tempF);
     }
+#endif
 
         // display new temporary value
     _displayVoidNum(tempNum, p_type, 1, 0);
@@ -957,6 +986,8 @@ void OMMenuMgr::_edit(OMMenuItem* p_item, uint8_t p_type) {
 
             _eewrite<uint8_t>(thisValue, *target);
         }
+#ifdef fullmenu
+
         else if( type == TYPE_BYTE) {
                 *reinterpret_cast<uint8_t*>(ptr) = m_temp;
                 _eewrite<uint8_t>(thisValue, *reinterpret_cast<uint8_t*>(ptr));
@@ -965,10 +996,14 @@ void OMMenuMgr::_edit(OMMenuItem* p_item, uint8_t p_type) {
                 *reinterpret_cast<unsigned int*>(ptr) = *reinterpret_cast<unsigned int*>(&m_tempI);
                 _eewrite<unsigned int>(thisValue, *reinterpret_cast<unsigned int*>(ptr));
         }
+
+#endif
         else if( type == TYPE_INT ) {
                 *reinterpret_cast<int*>(ptr) = m_tempI;
                 _eewrite<int>(thisValue, *reinterpret_cast<int*>(ptr));
         }
+#ifdef fullmenu
+
         else if( type == TYPE_ULONG ) {
                 *reinterpret_cast<unsigned long*>(ptr) = *reinterpret_cast<unsigned long*>(&m_tempL);
                 _eewrite<unsigned long>(thisValue, *reinterpret_cast<unsigned long*>(ptr));
@@ -981,6 +1016,7 @@ void OMMenuMgr::_edit(OMMenuItem* p_item, uint8_t p_type) {
                 *reinterpret_cast<float*>(ptr) = m_tempF;
                 _eewrite<float>(thisValue, *reinterpret_cast<float*>(ptr));
         }
+#endif
 
         m_inEdit = false;
         _activate(m_curParent, true);

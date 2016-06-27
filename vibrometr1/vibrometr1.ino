@@ -46,7 +46,7 @@ const byte SPI_CLOCK_SD = SPI_CLOCK_DIV16;//probably not effective
 const unsigned long WIRE_ACC_FREQ = 100000;//400000
 const unsigned long WIRE_RTC_FREQ = 100000;
 #else
-dataRate_t conf_datarate = ADXL345_DATARATE_400_HZ;//1600,800,400..
+dataRate_t conf_datarate = ADXL345_DATARATE_3200_HZ;//1600,800,400..
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV4;
 const byte SPI_CLOCK_RAM = SPI_CLOCK_DIV2;
 const byte SPI_CLOCK_SD = SPI_CLOCK_DIV2;
@@ -57,7 +57,7 @@ const unsigned long WIRE_RTC_FREQ = 100000;
 /*
 In [5]: (1024**2)/8/6/3200
 Out[5]: 6.826666666666666*/
-unsigned int conf_duration = 6;
+int conf_duration = 6;
 
 const byte LCD_BACKLIGHT_PIN  = 7;
 
@@ -92,7 +92,7 @@ void reconf(bool spi)
 
 	if (ramsz/samplesize < nsamples)
 	{
-		Serial.println(F("error: not enough ram"));
+		Serial.println(F("not enough ram"));
 		nsamples = ramsz/samplesize;
 	}
 
@@ -1188,7 +1188,15 @@ MENU_SELECT_ITEM  sel_adxlrate_200 = { 11, {"200HZ"} };
 MENU_SELECT_ITEM  sel_adxlrate_100 = { 10, {"100HZ"} };
 MENU_SELECT_ITEM  sel_adxlrate_50 = { 9, {"50HZ"} };
 
-MENU_SELECT_LIST adxlrate_list [] = { &sel_adxlrate_3200, &sel_adxlrate_1600, &sel_adxlrate_800, &sel_adxlrate_400, &sel_adxlrate_200, &sel_adxlrate_100, &sel_adxlrate_50};
+MENU_SELECT_LIST adxlrate_list [] = { 
+  &sel_adxlrate_50,
+  &sel_adxlrate_100, 
+  &sel_adxlrate_200, 
+  &sel_adxlrate_400, 
+  &sel_adxlrate_800, 
+  &sel_adxlrate_1600, 
+  &sel_adxlrate_3200, 
+};
 
 
 
@@ -1196,19 +1204,48 @@ MENU_SELECT_LIST adxlrate_list [] = { &sel_adxlrate_3200, &sel_adxlrate_1600, &s
 MENU_SELECT state_select = { &conf_datarate,           MENU_SELECT_SIZE(adxlrate_list),   MENU_TARGET(&adxlrate_list) };
 
 //    TYPE            MAX    MIN    TARGET
-MENU_VALUE menu_value_duration = { TYPE_UINT,       10000, 1,   MENU_TARGET(&conf_duration) };
+MENU_VALUE menu_value_duration = { TYPE_INT,       10000, 1,   MENU_TARGET(&conf_duration) };
 
-MENU_VALUE menu_value_rate = { TYPE_SELECT,     0,     0,     MENU_TARGET(&state_select) };
+MENU_VALUE menu_value_rate = { TYPE_SELECT,     15,     9,     MENU_TARGET(&state_select) };
 
 //        LABEL           TYPE        LENGTH    TARGET
+
+MENU_ITEM menu_a1 = { {"SPI acquire"}, ITEM_ACTION, 0, MENU_TARGET(m_spi_acquire) };
+MENU_ITEM menu_a2 = { {"I2C acquire"}, ITEM_ACTION, 0, MENU_TARGET(m_i2c_acquire) };
 MENU_ITEM menu_duration    = { {"duration[s]"},     ITEM_VALUE,  0,        MENU_TARGET(&menu_value_duration) };
-
 MENU_ITEM menu_datarate    = { {"datarate[HZ]"}, ITEM_VALUE,  0,        MENU_TARGET(&menu_value_rate ) };
+MENU_ITEM menu_a3 = { {"self-test"},  ITEM_ACTION, 0,        MENU_TARGET(m_self_test) };
+MENU_ITEM menu_a4 = { {"RAM test"}, ITEM_ACTION, 0, MENU_TARGET(test_ram) };
+MENU_ITEM menu_a5 = { {"RTC test"}, ITEM_ACTION, 0, MENU_TARGET(test_rtc) };
+MENU_ITEM menu_a6 = { {"SPI acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_spi_acquire) };
+MENU_ITEM menu_a7 = { {"I2C acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_i2c_acquire) };
 
-MENU_ITEM menu_selftest   = { {"self-test"},  ITEM_ACTION, 0,        MENU_TARGET(m_self_test) };
+void m_spi_acquire()
+{
+  m_acquire(true);
+}
+void m_i2c_acquire()
+{
+  m_acquire(false);
+}
+
+void m_spi_test()
+{
+  test_acc(true);
+}
+void m_i2c_test()
+{
+  test_acc(false);
+}
+
+
+//                       "f - SD card test\n"
+//                       "o - loop spi acquire\n"
+
 
 //        List of items in menu level
-MENU_LIST root_list[]   = { &menu_selftest, &menu_duration, &menu_datarate };
+MENU_LIST root_list[]   = { &menu_a1, &menu_a2, &menu_duration, &menu_datarate, &menu_a3, 
+&menu_a4, &menu_a5, &menu_a6, &menu_a7};
 
 // Root item is always created last, so we can add all other items to it
 MENU_ITEM menu_root     = { {"Root"},        ITEM_MENU,   MENU_SIZE(root_list),    MENU_TARGET(&root_list) };
@@ -1217,11 +1254,6 @@ MENU_ITEM menu_root     = { {"Root"},        ITEM_MENU,   MENU_SIZE(root_list), 
 OMMenuMgr Menu(&menu_root);
 
 
-void testAction() {
-	digitalWrite(LCD_BACKLIGHT_PIN, 0);
-	delay(100);
-	digitalWrite(LCD_BACKLIGHT_PIN, 1);
-}
 
 void uiQwkScreen() {
 	/*
@@ -1274,12 +1306,12 @@ void uiClear() {
 }
 
 
-void lcd_test()
+void menu()
 {
 
 
 	lcd.LCD_clear(); // blanks the display
-	digitalWrite(LCD_BACKLIGHT_PIN, 0);
+	digitalWrite(LCD_BACKLIGHT_PIN, 1);
 
 
 	Menu.setDrawHandler(uiDraw);
@@ -1293,82 +1325,12 @@ void lcd_test()
 	while(true)
 	{
 		byte b = Menu.checkInput();
-		if (b)
-			Serial.println(b);
+		/*if (b)
+			Serial.println(b);*/
 	}
 }
 
 
-
-
-
-
-
-void menu()
-{
-	char i = 'l';
-
-	while(true)
-	{
-
-
-		switch (i)
-		{
-		case 'h':
-			Serial.println(F("\n"
-			                 "h - help\n"
-			                 "d - detect HW\n"
-			                 "f - SD card test\n"
-			                 "m - memory test\n"
-			                 "c - real time clock test\n"
-			                 "s - SPI accelerometer test\n"
-			                 "i - I2C accelerometer test\n"
-			                 "r - run (SPI)\n"
-			                 "2 - run (I2C)\n"
-			                 "l - lcd test\n"
-			                 "o - loop spi acquire\n"
-
-			                ));
-			break;
-		case 'd':
-			m_self_test();
-			break;
-		case 'f':
-			test_sd(); //az bude misto: zapis nejakeho jednoducheho souboru a jeho zpetne precteni, proste neco jednoducheho na otetsovani SD karty
-			break;
-		case 'm':
-			test_ram();
-			break;
-		case 'c':
-			test_rtc();
-			break;
-		case 's':
-			test_acc(true);
-			break;
-		case 'i':
-			test_acc(false);
-			break;
-		case 'r':
-			m_acquire(true);
-			break;
-		case '2':
-			m_acquire(false);
-			break;
-		case 'o':
-			while(true)
-				m_acquire(true);
-			break;
-		case 'l':
-			lcd_test();
-			break;
-		}
-
-		Serial.println('>');
-		while(!Serial.available()) {};
-		i = Serial.read();
-	}
-
-}
 
 
 
