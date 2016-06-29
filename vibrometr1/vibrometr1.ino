@@ -37,7 +37,7 @@
 //vypisovani verbatim toho co se zapisuje do souboru na seriak
 const bool serial_print = 1;
 
-#define SLOW
+//#define SLOW
 #ifdef SLOW
 dataRate_t conf_datarate = ADXL345_DATARATE_100_HZ;//1600,800,400..
 const byte SPI_CLOCK_ACC = SPI_CLOCK_DIV16;
@@ -86,7 +86,7 @@ void reconf(bool spi)
 
 	samplesize = 3*2;
 
-	unsigned int hz = 3200/(16-datarate);
+	unsigned int hz = 3200>>(15-datarate);
 
 	nsamples = conf_duration * hz;
 
@@ -522,6 +522,7 @@ void acquire_acc(bool spi)
 	}
 }
 
+byte entries;
 
 void acquire(Acc &acc)
 {
@@ -540,6 +541,7 @@ void acquire(Acc &acc)
 	  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
 	  spi_end();
 	  do_wait = false;
+    entries = 0;
 	  for(byte i = 0; i < 50; i++)
 	    acc_read();
 	  do_wait = true;
@@ -550,18 +552,18 @@ void acquire(Acc &acc)
 	  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
 	  spi_end();
 	  address = 0;
+    entries = 0;
 	  while(address < nsamples * samplesize)
 	    acc_read();
 
 	  rtc_read(end_tm);
-	  Serial.print(F("end: "));   Serial.println(time_string(end_tm));
+	  Serial.print(F("\nend: "));   Serial.println(time_string(end_tm));
 	  
 }
 
 
 void acc_wait(void)
 {	
-	 byte entries;
 	 do
 	 {
 	   byte status;
@@ -590,11 +592,10 @@ void acc_wait(void)
 }
 
 
-
 void acc_read(void)
 {	
 	  char buf[6];
-	  byte entries = 123;
+	  
 	  byte status ;
 
 
@@ -604,8 +605,18 @@ void acc_read(void)
 	    SPI.transfer(ADXL345_REG_DATAX0 | RD | MB);
 	    for (int a = 0; a < 6; a++)
 	      buf[a] = SPI.transfer(0);
-	    SPI.transfer(0); // FIFO_CTL zahodime
-	    status = SPI.transfer(0);
+      if(!entries)
+      {
+	      SPI.transfer(0); // FIFO_CTL zahodime
+	      status = SPI.transfer(0);
+
+        entries = status & 0b111111;
+        if (entries > 30 && ! just_print)
+            Serial.println(F("overflow"));
+    
+      }
+      else entries--;
+      
 	    spi_end();
 	  }
 	  else
@@ -613,18 +624,23 @@ void acc_read(void)
 	    Wire.beginTransmission(ADXL345_ADDRESS);
 	    Wire.write(ADXL345_REG_DATAX0 | MB);
 	    Wire.endTransmission();
-	    Wire.requestFrom(ADXL345_ADDRESS, 8);
+	    Wire.requestFrom(ADXL345_ADDRESS, entries ? 6 : 8);//count seems ignored
 	    for (int a = 0; a < 6; a++)
 	        buf[a] = Wire.read();
-	    Wire.read();
-	    status = Wire.read();
+
+      if(!entries)
+      {
+        Wire.read();
+	      status = Wire.read();
+
+        entries = status & 0b111111;
+        if (entries > 30 && ! just_print)
+            Serial.println(F("overflow"));
+      }
+      else entries--;
+       
 	  }
 
-	  entries = status & 0b111111;
-	  if (entries > 30 && ! just_print)
-	  {
-	      Serial.println(F("overflow"));
-	  }
 
 	  if(entries == 0 && do_wait)
 	  {
@@ -706,8 +722,6 @@ void sd_out()
 	now_string();//init
 
 	tmElements_t w_start_tm, w_end_tm;
-	rtc_read(w_start_tm);
-	time_t w_start_time = makeTime(w_start_tm);
 
 
 	Serial.print(F("ok.."));
@@ -734,6 +748,7 @@ void sd_out()
 
 	Serial.print(F("toread bytes:"));
 	Serial.println(toread);
+
 	Serial.println(F("writing..."));
 
 	out(time_string(end_tm));
@@ -750,6 +765,11 @@ void sd_out()
 	const unsigned int bufused = sib * samplesize;
 
 	spi_end();
+
+
+  rtc_read(w_start_tm);
+  time_t w_start_time = makeTime(w_start_tm);
+  
 
 	for(address = 0; address + bufused < toread; address += bufused)
 	{
