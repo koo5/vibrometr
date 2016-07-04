@@ -1239,6 +1239,7 @@ MENU_ITEM menu_a4 = { {"RAM test"}, ITEM_ACTION, 0, MENU_TARGET(test_ram) };
 MENU_ITEM menu_a5 = { {"RTC test"}, ITEM_ACTION, 0, MENU_TARGET(test_rtc) };
 MENU_ITEM menu_a6 = { {"SPI acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_spi_acquire) };
 MENU_ITEM menu_a7 = { {"I2C acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_i2c_acquire) };
+MENU_ITEM menu_a8 = { {"clock"}, ITEM_ACTION, 0, MENU_TARGET(m_clock) };
 
 void m_spi_acquire()
 {
@@ -1265,7 +1266,7 @@ void m_i2c_test()
 
 //        List of items in menu level
 MENU_LIST root_list[]   = { &menu_a1, &menu_a2, &menu_duration, &menu_datarate, &menu_a3, 
-&menu_a4, &menu_a5, &menu_a6, &menu_a7};
+&menu_a4, &menu_a5, &menu_a6, &menu_a7, &menu_a8};
 
 // Root item is always created last, so we can add all other items to it
 MENU_ITEM menu_root     = { {"Root"},        ITEM_MENU,   MENU_SIZE(root_list),    MENU_TARGET(&root_list) };
@@ -1275,21 +1276,18 @@ OMMenuMgr Menu(&menu_root);
 
 
 
-void uiQwkScreen() {
-	/*
+void m_clock() 
+{
+
 	  lcd.clear();
 	  Menu.enable(false);
 
-	  lcd.print("Action!");
-	  lcd.setCursor(0, 1);
-	  lcd.print("Enter 2 return");
-
 	  while( Menu.checkInput() != BUTTON_SELECT ) {
-	    ; // wait!
+		uiDraw(now_string(), 0, 0);
 	  }
 
 	  Menu.enable(true);
-	  lcd.clear();*/
+	  lcd.clear();
 }
 
 
