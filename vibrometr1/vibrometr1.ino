@@ -1237,8 +1237,8 @@ MENU_ITEM menu_datarate    = { {"datarate[HZ]"}, ITEM_VALUE,  0,        MENU_TAR
 MENU_ITEM menu_a3 = { {"self-test"},  ITEM_ACTION, 0,        MENU_TARGET(m_self_test) };
 MENU_ITEM menu_a4 = { {"RAM test"}, ITEM_ACTION, 0, MENU_TARGET(test_ram) };
 MENU_ITEM menu_a5 = { {"RTC test"}, ITEM_ACTION, 0, MENU_TARGET(test_rtc) };
-MENU_ITEM menu_a6 = { {"SPI acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_spi_acquire) };
-MENU_ITEM menu_a7 = { {"I2C acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_i2c_acquire) };
+MENU_ITEM menu_a6 = { {"SPI acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_spi_test) };
+MENU_ITEM menu_a7 = { {"I2C acc test"}, ITEM_ACTION, 0, MENU_TARGET(m_i2c_test) };
 MENU_ITEM menu_a8 = { {"clock"}, ITEM_ACTION, 0, MENU_TARGET(m_clock) };
 
 void m_spi_acquire()
@@ -1276,21 +1276,6 @@ OMMenuMgr Menu(&menu_root);
 
 
 
-void m_clock() 
-{
-
-	  lcd.clear();
-	  Menu.enable(false);
-
-	  while( Menu.checkInput() != BUTTON_SELECT ) {
-		uiDraw(now_string(), 0, 0);
-	  }
-
-	  Menu.enable(true);
-	  lcd.clear();
-}
-
-
 void uiDraw(char* text, int row, int col, int len=0) {
 	/*Serial.print(row);
 	Serial.print(' ');
@@ -1306,7 +1291,7 @@ void uiDraw(char* text, int row, int col, int len=0) {
 
 		if ((!len && !ch)
 		        ||
-		        ( i >= len))
+		        ( len&&(i >= len)))
 			break;
 		i++;
 		if( ch < '!' || ch > '~' ) ch = ' ';
@@ -1319,7 +1304,7 @@ void uiDraw(char* text, int row, int col, int len=0) {
 
 void uiClear() {
 
-	lcd.LCD_clear(); // blanks the display
+	lcd.LCD_clear();
 	uiDraw("Push Select for Menu",0,0);
 }
 
@@ -1327,8 +1312,7 @@ void uiClear() {
 void menu()
 {
 
-
-	lcd.LCD_clear(); // blanks the display
+	lcd.LCD_clear();
 	digitalWrite(LCD_BACKLIGHT_PIN, 1);
 
 
@@ -1348,6 +1332,31 @@ void menu()
 	}
 }
 
+
+void m_clock() 
+{
+
+    lcd.LCD_clear();
+    Menu.enable(false);
+
+    while( Menu.checkInput() != BUTTON_BACK ) {
+
+      tmElements_t tm;
+      rtc_read(tm);
+      char b[50];
+      SPRINTF(b, "%02d:%02d:%02d",
+          tm.Hour,
+          tm.Minute,
+          tm.Second);
+
+      lcd.LCD_write_string_big(0,1,b,MENU_NORMAL);
+      //Serial.println(b);
+      delay(10);
+    }
+
+    Menu.enable(true);
+    lcd.LCD_clear();
+}
 
 
 

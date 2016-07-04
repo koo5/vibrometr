@@ -175,10 +175,11 @@ void LCD4884::LCD_write_string_big ( unsigned char X,unsigned char Y, char *stri
 {
     while ( *string ){
          
-        LCD_write_char_big( X, Y, *string , mode );
+	char ch = *string++;
+        LCD_write_char_big( X, Y, ch , mode );
         
-        if(*string++ == '.')
-          X += 5;
+        if(ch == '.' || ch == ':')
+          X += 4;
         else
           X += 12;
     }	
@@ -200,6 +201,8 @@ void LCD4884::LCD_write_char_big (unsigned char X,unsigned char Y, unsigned char
     ch = 11;
    else if (ch == '-')
     ch = 12;
+   else if (ch == ':')
+    ch = 13;
    else
     ch = ch & 0x0f;
 	
