@@ -99,6 +99,9 @@ void reconf(bool spi)
 	nsamples &= ~1;
 
 	toread = nsamples * samplesize;
+  Serial.print("nsamples :");
+  Serial.println(nsamples);
+   
 }
 
 
