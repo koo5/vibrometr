@@ -1342,19 +1342,73 @@ void m_clock()
     lcd.LCD_clear();
     Menu.enable(false);
 
-    while( Menu.checkInput() != BUTTON_BACK ) {
+    char pos = -1;
 
+    while( pos != -2 ) {
+
+      
       tmElements_t tm;
       rtc_read(tm);
-      char b[50];
-      SPRINTF(b, "%02d:%02d:%02d",
-          tm.Hour,
-          tm.Minute,
-          tm.Second);
 
-      lcd.LCD_write_string_big(0,1,b,MENU_NORMAL);
-      //Serial.println(b);
-      delay(10);
+      
+      
+      int b = Menu.checkInput();
+      char inc = 0;
+      switch(b)
+      {
+        case BUTTON_BACK:
+        pos -= 1;
+        break;
+        case BUTTON_FORWARD:
+        pos += 1;
+        if (pos > 4) pos = 4;
+        break;
+        case BUTTON_INCREASE:
+        inc = 1;
+        break;
+        case BUTTON_DECREASE:
+        inc = -1;
+        break;
+      }
+
+      if(inc)
+      {
+
+        switch(pos)
+        {
+          case 0:
+            tm.Hour += inc;
+            break;
+          case 1:
+            tm.Minute += inc;
+            break;
+          case 2:
+            tm.Second += inc;
+            break;
+          case 3:
+            tm.Day += inc;
+            break;
+          case 4:
+            tm.Month += inc;
+            break;
+        }
+        RTC.write(tm);
+        rtc_read(tm);
+      }
+      
+      char buf[50];
+      SPRINTF(buf, "%02d:%02d:%02d", tm.Hour, tm.Minute, tm.Second);
+      lcd.LCD_write_string_big(0,0,buf,MENU_NORMAL);
+      SPRINTF(buf, "%02d.%02d   ", tm.Day, tm.Month);
+      lcd.LCD_write_string_big(8,3,buf,MENU_NORMAL);
+
+      if(pos != -1)
+      {
+        SPRINTF(buf, "%01d", (int)pos);
+        lcd.LCD_write_string(7*8,3,buf,MENU_NORMAL);
+
+      }
+      
     }
 
     Menu.enable(true);

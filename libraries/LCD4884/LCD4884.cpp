@@ -203,6 +203,8 @@ void LCD4884::LCD_write_char_big (unsigned char X,unsigned char Y, unsigned char
     ch = 12;
    else if (ch == ':')
     ch = 13;
+   else if (ch == ' ')
+    ch = 14;
    else
     ch = ch & 0x0f;
 	

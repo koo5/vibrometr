@@ -6,7 +6,7 @@
 //******* VERY LARGE FONTS ********** 
 //used here for displaying temperature
 
-unsigned const char   big_number[14][3][16] PROGMEM = {
+unsigned const char   big_number[15][3][16] PROGMEM = {
 
 0,128,192,224,224,96,224,224,  //'0'
 192,128,0,0,0,0,0,0
@@ -146,6 +146,17 @@ unsigned const char   big_number[14][3][16] PROGMEM = {
 0,0,0,0,0,0,0,0
 ,
 60,60,60,0,0,0,0,0,
+0,0,0,0,0,0,0,0
+
+,
+
+0,0,0,0,0,0,0,0,	  		  		 //' '
+0,0,0,0,0,0,0,0
+,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0
+,
+0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0
 
 
