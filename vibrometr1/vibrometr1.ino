@@ -1437,4 +1437,12 @@ Tady udelejete prosim alespon nastavovani realneho casu,
 nastavovani parametru naberu dat z ADXL (dobu sberu dat, vzorkovaci frekvenci) 
 a pak sem prevedte testovaci menu.
  Do menu pridejte jeste moznost zaobrazovani realneho casu. Aby to cele vypadalo jako hodiny s datumem.
+
+
+uprava SD knihovny -
+https://github.com/arduino/Arduino/issues/3607
+
+
 */
+
+
