@@ -1327,6 +1327,10 @@ void menu()
 	Menu.m_menuActive = true;
 	Menu._handleButton(BUTTON_SELECT);
 
+
+m_clock() ;
+
+
 	while(true)
 	{
 		byte b = Menu.checkInput();
@@ -1336,13 +1340,17 @@ void menu()
 }
 
 
+
+
+
 void m_clock() 
 {
 
-    lcd.LCD_clear();
     Menu.enable(false);
 
-    char pos = -1;
+    lcd.LCD_clear();
+
+    char pos = 0;//-1;
 
     while( pos != -2 ) {
 
@@ -1358,10 +1366,12 @@ void m_clock()
       {
         case BUTTON_BACK:
         pos -= 1;
+        //clockclear();
         break;
         case BUTTON_FORWARD:
         pos += 1;
         if (pos > 4) pos = 4;
+      //  clockclear();
         break;
         case BUTTON_INCREASE:
         inc = 1;
@@ -1395,26 +1405,54 @@ void m_clock()
         RTC.write(tm);
         rtc_read(tm);
       }
-      
-      char buf[50];
-      SPRINTF(buf, "%02d:%02d:%02d", tm.Hour, tm.Minute, tm.Second);
-      lcd.LCD_write_string_big(0,0,buf,MENU_NORMAL);
-      SPRINTF(buf, "%02d.%02d   ", tm.Day, tm.Month);
-      lcd.LCD_write_string_big(8,3,buf,MENU_NORMAL);
 
-      if(pos != -1)
+      char buf[5][5];
+
+      byte * data[5];
+      data [0] = &tm.Hour;
+      data [1] = &tm.Minute;
+      data [2] = &tm.Second;
+      data [3] = &tm.Day;
+      data [4] = &tm.Month;
+      
+      const byte loc[5][2] = {{0,0},{12*2+4,0},{12*2+4+12*2+4,0},{12,3},{12+12*2+4,3}};
+
+      const char * fmt[] = {"%02d:", "%02d:", "%02d", "%02d.", "%02d"};
+      
+      for (byte x = 0; x<5; x++)
+        SPRINTF(buf[x], fmt[x], (int)(*data[x]));
+
+      static byte counter;
+      counter++;
+         
+          
+      for (byte x = 0; x<5; x++)
       {
-        SPRINTF(buf, "%01d", (int)pos);
-        lcd.LCD_write_string(7*8,3,buf,MENU_NORMAL);
+        byte mode;
+        if ((pos == x) && ((counter >> 2)&1))
+          mode = MENU_HIGHLIGHT;
+        else mode = MENU_NORMAL;
+          //continue;//blink
 
+        lcd.LCD_write_string_big(loc[x][0],loc[x][1],buf[x],mode);
+
+        
       }
-      
     }
-
+    
     Menu.enable(true);
     lcd.LCD_clear();
 }
-
+/*
+void clockclear()
+{      
+      lcd.LCD_clear();
+      lcd.LCD_write_string_big(12*2,0,":",MENU_NORMAL);
+      lcd.LCD_write_string_big(12*2+4+12*2,0,":",MENU_NORMAL);
+      lcd.LCD_write_string_big(12+12*2,3,".",MENU_NORMAL);
+}
+*/
+//void clockwrite(byte x, byte y, const char * format, byte val)
 
 
 
