@@ -1284,7 +1284,7 @@ void uiDraw(char* text, int row, int col, int len=0) {
 	Serial.print(' ');
 	Serial.print(col);
 	Serial.print(':');*/
-	lcd.LCD_set_XY(col*8, row);
+	lcd.LCD_set_XY(col*6, row);
 
 	int i = 0;
 	while(true)
@@ -1328,7 +1328,7 @@ void menu()
 	Menu._handleButton(BUTTON_SELECT);
 
 
-m_clock() ;
+//m_clock() ;
 
 
 	while(true)
@@ -1345,7 +1345,14 @@ m_clock() ;
 
 void m_clock() 
 {
-
+    bool doupdate = true;
+    bool blink_flag;
+    tmElements_t old,tm;
+    rtc_read(old);
+    rtc_read(tm);
+    unsigned long m, oldm;
+    unsigned int counter;
+    
     Menu.enable(false);
 
     lcd.LCD_clear();
@@ -1353,12 +1360,13 @@ void m_clock()
     char pos = 0;//-1;
 
     while( pos != -2 ) {
-
       
-      tmElements_t tm;
-      rtc_read(tm);
-
-      
+      m = millis();
+      if (m - oldm > 1000)
+      {
+        oldm = m;
+        rtc_read(tm);
+      }   
       
       int b = Menu.checkInput();
       char inc = 0;
@@ -1366,12 +1374,12 @@ void m_clock()
       {
         case BUTTON_BACK:
         pos -= 1;
-        //clockclear();
+        doupdate = true;
         break;
         case BUTTON_FORWARD:
         pos += 1;
         if (pos > 4) pos = 4;
-      //  clockclear();
+        doupdate = true;
         break;
         case BUTTON_INCREASE:
         inc = 1;
@@ -1405,6 +1413,34 @@ void m_clock()
         RTC.write(tm);
         rtc_read(tm);
       }
+      
+
+
+      
+      if (
+        old.Second != tm.Second ||
+        old.Minute != tm.Minute ||
+        old.Hour != tm.Hour ||
+        old.Day != tm.Day||
+        old.Month!= tm.Month||
+        old.Year != tm.Year)
+        {
+          doupdate = true;
+          old = tm;
+        }
+         
+         
+      
+      if (((m>>8)&1)==blink_flag)
+      {
+        blink_flag = !blink_flag;
+        doupdate = true;
+      }
+      
+      
+      if(doupdate)
+      {
+      doupdate = false;
 
       char buf[5][5];
 
@@ -1422,14 +1458,10 @@ void m_clock()
       for (byte x = 0; x<5; x++)
         SPRINTF(buf[x], fmt[x], (int)(*data[x]));
 
-      static byte counter;
-      counter++;
-         
-          
       for (byte x = 0; x<5; x++)
       {
         byte mode;
-        if ((pos == x) && ((counter >> 2)&1))
+        if ((pos == x) && blink_flag)
           mode = MENU_HIGHLIGHT;
         else mode = MENU_NORMAL;
           //continue;//blink
@@ -1438,6 +1470,10 @@ void m_clock()
 
         
       }
+      
+      
+    }
+      
     }
     
     Menu.enable(true);

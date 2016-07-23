@@ -261,36 +261,13 @@ uint8_t OMMenuMgr::checkInput() {
 
         // no button is pressed, or the menu display
         // is disabled
-    if( key == BUTTON_NONE || ! m_enable ) {
+    if( key == BUTTON_NONE ) {
         held      = 0;
         m_holdMod = 1;
         holdKey   = BUTTON_NONE;
-        return key;
     }
-
-
-
-
-
-
-
-
-
-
-
-        // if the menu hasn't been drawn, ignore
-        // interaction features
-
-    if( key == BUTTON_SELECT )
-        m_menuActive = true;
-
-    if( ! m_menuActive )
-        return key;
-
-        // when a button is held, like up or down,
-        // we increase the modifier over time to allow
-        // the rate at which numbers go up/down to increase
-
+    else
+    {
     if( key == holdKey ) {
         held++;
         if( !(held % 4) )
@@ -300,17 +277,24 @@ uint8_t OMMenuMgr::checkInput() {
         holdKey   = key;
         m_holdMod = 1;
     }
+    
+    if(held && !(held > 5 && !(held%4)) )
+    	key = BUTTON_NONE;
+    }
+    
 
+if(m_enable && key != BUTTON_NONE)
+{
+    if( key == BUTTON_SELECT )
+        m_menuActive = true;
 
-    if(!held || (held > 5 && !(held%4)) )
-	    _handleButton(key);
+    if(  m_menuActive )
+       	_handleButton(key);
 
+}
 
-	Serial.println(held);
-
+    Serial.println(held);
     return key;
-
-
 }
 
 /** Enable or Disable Handling of Menu
