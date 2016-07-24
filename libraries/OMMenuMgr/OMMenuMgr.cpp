@@ -48,9 +48,9 @@
 
  */
 
-OMMenuMgr::OMMenuMgr(const OMMenuItem* c_first, uint8_t c_type) {
+OMMenuMgr::OMMenuMgr(const OMMenuItem* c_first/*, uint8_t c_type*/) {
 
-    m_inputType  = c_type;
+//    m_inputType  = c_type;
     m_curParent  = const_cast<OMMenuItem*>(c_first);
     m_rootItem   = const_cast<OMMenuItem*>(c_first);
     m_inEdit     = false;
@@ -103,6 +103,7 @@ OMMenuMgr::OMMenuMgr(const OMMenuItem* c_first, uint8_t c_type) {
 
 
  */
+ /*
 void OMMenuMgr::setAnalogButtonPin(uint8_t p_pin, const int p_values[5][2], int p_thresh) {
 
     if( m_inputType != MENU_ANALOG )
@@ -120,7 +121,7 @@ void OMMenuMgr::setAnalogButtonPin(uint8_t p_pin, const int p_values[5][2], int 
     digitalWrite(p_pin, HIGH);
 
 }
-
+*/
 /** Setup Digital Button Input
 
  For UI's with digital button input (e.g. one digital input per button), this
@@ -146,7 +147,7 @@ void OMMenuMgr::setAnalogButtonPin(uint8_t p_pin, const int p_values[5][2], int 
  @param p_values
  The list of button values and functions
 
- */
+ *//*
 void OMMenuMgr::setDigitalButtonPins(const int p_values[5][2]) {
 
     if( m_inputType != MENU_DIGITAL )
@@ -163,7 +164,7 @@ void OMMenuMgr::setDigitalButtonPins(const int p_values[5][2]) {
 
     }
 
-}
+}*/
 
 /** Set Draw Handler Callback
 
@@ -235,11 +236,11 @@ uint8_t OMMenuMgr::checkInput() {
         // get which button is pressed
     int key = BUTTON_NONE;
 
-    if( m_inputType == MENU_ANALOG )
+//    if( m_inputType == MENU_ANALOG )
         key = _checkAnalog();
-    else
+  /*  else
         key = _checkDigital();
-
+*/
 
     if( key != lastKey ) {
             // did not have two reads in the row with same key,
@@ -293,7 +294,7 @@ if(m_enable && key != BUTTON_NONE)
 
 }
 
-    Serial.println(held);
+//    Serial.println(held);
     return key;
 }
 
@@ -377,26 +378,69 @@ unsigned int OMMenuMgr::holdModifier() {
 
 int OMMenuMgr::_checkAnalog() {
 
-    int curVal = analogRead(m_anaPin);
+
+
+
+
+// which input is our button
+const byte BUT_PIN = 14;
+
+// analog button read values
+const int BUTSEL_VAL  = 163;
+const int BUTFWD_VAL  = 525;
+const int BUTREV_VAL  = 14;
+const int BUTDEC_VAL  = 351;
+const int BUTINC_VAL  = 756;
+
+const byte BUT_THRESH  = 60;
+
+const byte BUT_MAP[5] = {
+	BUTTON_FORWARD,
+	BUTTON_INCREASE,
+	BUTTON_DECREASE,
+	BUTTON_BACK,
+	BUTTON_SELECT};
+
+const int VAL_MAP[5] = {
+	BUTFWD_VAL,
+	BUTINC_VAL,
+	BUTDEC_VAL,
+	BUTREV_VAL,
+	BUTSEL_VAL};
+
+
+
+
+
+
+    int curVal = analogRead(BUT_PIN);
 
     static int lastVal = 0;
 
         // isolate jitter in a single cycle
-    if( abs(lastVal - curVal) > m_anaThresh ) {
+    if( abs(lastVal - curVal) > BUT_THRESH ) {
         lastVal = curVal;
         return(BUTTON_NONE);
     }
 
 
+
+
+
+
+
+
         // check to see which analog button was read
     for(byte i = 0; i < 5; i++ ) {
-        if( curVal > (m_butVals[i][0] - m_anaThresh) && curVal < (m_butVals[i][0] + m_anaThresh) )
-            return m_butVals[i][1];
+        if( curVal > (VAL_MAP[i] - BUT_THRESH) && curVal < (VAL_MAP[i] + BUT_THRESH) )
+            return BUT_MAP[i];
     }
 
     return BUTTON_NONE;
 }
 
+
+/*
 int OMMenuMgr::_checkDigital() {
 
     // check to see which analog button was read
@@ -407,7 +451,7 @@ int OMMenuMgr::_checkDigital() {
 
     return BUTTON_NONE;
 }
-
+*/
 
 
 void OMMenuMgr::_display(char* p_str, int p_row, int p_col, int p_count) {
@@ -587,7 +631,9 @@ void OMMenuMgr::_activate(OMMenuItem* p_item, bool p_return) {
         // out of progmem
         f_valueHandler callback = reinterpret_cast<f_valueHandler>( reinterpret_cast<void*>(pgm_read_word(&(p_item->target)) ));
 
-        if( callback != 0 )
+	
+
+        //if( callback != 0 )
             callback();
 
         if( m_enable )
@@ -729,8 +775,8 @@ void OMMenuMgr::_displayEdit(OMMenuItem* p_item) {
 #ifdef fullmenu
     else if( type >= TYPE_FLOAT ) // always run as last check
         m_tempF    = *reinterpret_cast<float*>(valPtr);
-#endif
 
+#endif
 
     // throw number on-screen
     _displayVoidNum(valPtr, type, 1, 0);

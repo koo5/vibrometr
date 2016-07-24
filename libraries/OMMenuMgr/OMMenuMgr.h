@@ -49,7 +49,7 @@
 #endif
 
 #ifndef OM_MENU_MAXDEPTH
-    #define OM_MENU_MAXDEPTH    3
+    #define OM_MENU_MAXDEPTH    2
 #endif
 
 #ifndef OM_MENU_DEBOUNCE
@@ -961,11 +961,11 @@ class OMMenuMgr {
 
 public:
 
-    OMMenuMgr(const OMMenuItem* c_first, uint8_t c_type = MENU_ANALOG);
+    OMMenuMgr(const OMMenuItem* c_first);
 
-    void setAnalogButtonPin(uint8_t p_pin, const int p_values[5][2], int p_thresh);
+/*    void setAnalogButtonPin(uint8_t p_pin, const int p_values[5][2], int p_thresh);
     void setDigitalButtonPins(const int p_pins[5][2]);
-
+*/
     uint8_t checkInput();
 
     void enable(bool p_en);
@@ -999,9 +999,9 @@ private:
     typedef void(*f_drawHandler)(char*, int, int, int);
     typedef void(*f_seekHandler)(int, int);
 
-    uint8_t        m_inputType;
-    uint8_t        m_anaPin;
-    int            m_anaThresh;
+//    uint8_t        m_inputType;
+//    uint8_t        m_anaPin;
+//    int            m_anaThresh;
     bool           m_enable;
     bool           m_inEdit;
     bool           m_forceReturn;
@@ -1009,7 +1009,7 @@ private:
     OMMenuItem*    m_curParent;
     OMMenuItem*    m_rootItem;
     OMMenuItem*    m_hist[OM_MENU_MAXDEPTH];
-    int            m_butVals[5][2];
+//    int            m_butVals[5][2];
     uint8_t        m_curTarget;
     f_drawHandler  m_draw;
     f_valueHandler m_exit;
@@ -1023,7 +1023,7 @@ private:
 
 
     int         _checkAnalog();
-    int         _checkDigital();
+  //  int         _checkDigital();
     void        _activate(OMMenuItem* p_item, bool p_return = false);
     void        _edit(OMMenuItem* p_item, uint8_t p_type);
     void        _displayList(OMMenuItem* p_item, uint8_t p_target = 0);

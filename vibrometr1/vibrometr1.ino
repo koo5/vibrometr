@@ -20,11 +20,88 @@
 
 
 
+const byte dispW = OM_MENU_COLS;
+const byte dispH = OM_MENU_ROWS+1;
+
+class Disp : public Print
+{
+  char buf[dispH][dispW];
+  byte nextX = 0;
+  byte nextY = 0;
+
+  public:
+  Disp()
+  {
+    cls();
+  }
+
+  void cls()
+  {
+    for(byte x = 0; x < dispW * dispH; x++)
+      add(' ');
+    nextX = nextY = 0;
+  }
+
+  void nl()
+  {
+    nextX = 0;
+    nextY++;
+    if (nextY == dispH)
+      nextY = 0;
+    for(byte i=0;i<dispW;i++)
+      buf[nextY][i] = ' ';
+  }
+  
+  bool add(uint8_t ch)
+  { 
+    bool redraw = false;
+    if (ch == 13)
+    {}
+    else if (ch == '\n')
+    {
+      nl();
+      redraw = true;
+    }
+    else
+      buf[nextY][nextX++] = ch;
+    if (nextX == dispW)
+    {
+      nl();
+      redraw = true;
+    }
+    return redraw;
+  }
+  
+  size_t write(uint8_t ch)
+  {
+    Serial.write(ch);
+
+    bool redraw = add(ch);
+    byte bufY = nextY;
+    for(byte y = 0; y < dispH; y++)
+    {
+      if (++bufY == dispH)
+        bufY = 0;
+      if(redraw)
+      {
+        for(byte x = 0; x < dispW; x++)
+        {
+          lcd.LCD_set_XY(x*6, y);
+          lcd.LCD_write_char(buf[bufY][x], MENU_NORMAL);
+        }
+      }
+      else if (y == dispH - 1)
+      {
+        lcd.LCD_set_XY((nextX-1)*6, y);
+        lcd.LCD_write_char(buf[bufY][nextX-1], MENU_NORMAL);
+      }
+     
+    }
+  }
+};
 
 
-
-
-
+Disp disp;
 
 
 
@@ -60,7 +137,7 @@ Out[5]: 6.826666666666666*/
 int conf_duration = 6;
 
 const byte LCD_BACKLIGHT_PIN  = 7;
-
+const byte BUT_PIN = 14;
 const byte cssd = 10;
 const byte csacc = 9;
 const byte csram = 8;
@@ -92,21 +169,21 @@ void reconf(bool spi)
 
 	if (ramsz/samplesize < nsamples)
 	{
-		Serial.println(F("not enough ram"));
+		disp.println(F("not enough ram"));
 		nsamples = ramsz/samplesize;
 	}
 
 	nsamples &= ~1;
 
 	toread = nsamples * samplesize;
-  Serial.print("nsamples :");
-  Serial.println(nsamples);
+  disp.print(F("nsamples :"));
+  disp.println(nsamples);
    
 }
 
 
 
-#define newspi
+//#define newspi
 #ifdef newspi
 void spi_ram_start()
 {
@@ -253,18 +330,18 @@ int I2C_ClearBus() {
 void clear_i2c() {
 
 	if (I2C_ClearBus() != 0) {
-		Serial.println(F("I2C err"));
+		disp.println(F("I2C err"));
 		/*if (rtn == 1) {
-		  Serial.println(F("SCL clock line held low"));
+		  disp.println(F("SCL clock line held low"));
 		} else if (rtn == 2) {
-		  Serial.println(F("SCL clock line held low by slave clock stretch"));
+		  disp.println(F("SCL clock line held low by slave clock stretch"));
 		} else if (rtn == 3) {
-		  Serial.println(F("SDA data line held low"));
+		  disp.println(F("SDA data line held low"));
 		}*/
 	}
 	else
 	{
-		//Serial.println(F("i2c bus clear"));
+		//disp.println(F("i2c bus clear"));
 		// re-enable Wire
 		// now can start Wire Arduino master
 		Wire.begin();
@@ -294,11 +371,11 @@ String now_string(void)
     String r = String(F("RTCerror"));
 		if (RTC.chipPresent())
 		{
-			Serial.println(F("RTC stopped. please set time."));
+			disp.println(F("RTC stopped. please set time."));
 		}
 		else
 		{
-		  Serial.println(r);//!  Please check the circuitry.
+		  disp.println(r);//!  Please check the circuitry.
 		}
     return r;
 	}
@@ -331,10 +408,10 @@ String fn_time_string(tmElements_t &tm)
 
 
 void test_rtc() {
-	Serial.println(F("DS1307RTC Test"));
+	disp.println(F("DS1307RTC Test"));
 	for (byte i = 0; i < 3; i++)
 	{
-		Serial.println(now_string());
+		disp.println(now_string());
 		delay(1000);
 	}
 }
@@ -377,7 +454,7 @@ void sram_start(byte mode, unsigned long address)
 
 void test_ram()
 {
-	Serial.println(F("sram test:"));
+	disp.println(F("sram test:"));
 
 	uint32_t address = 0;
 	uint32_t fails = 0;
@@ -396,14 +473,14 @@ void test_ram()
 		byte d4 = b >> 24;
 		/*
 
-		        Serial.print("in:");
-		        Serial.print((long)d1);
-		        Serial.print("  ");
-		        Serial.print((long)d2);
-		        Serial.print("  ");
-		        Serial.print((long)d3);
-		        Serial.print("  ");
-		        Serial.println((long)d4);
+		        disp.print("in:");
+		        disp.print((long)d1);
+		        disp.print("  ");
+		        disp.print((long)d2);
+		        disp.print("  ");
+		        disp.print((long)d3);
+		        disp.print("  ");
+		        disp.println((long)d4);
 		*/
 
 		SPI.transfer(d1);
@@ -413,7 +490,7 @@ void test_ram()
 	}
 	spi_end();
 
-	Serial.print("..");
+	disp.print("..");
 
 	sram_start(SRAM_READ, address);
 	for(d = 0; d < ramsz/4; d++)
@@ -427,14 +504,14 @@ void test_ram()
 		byte d3 = SPI.transfer(0);
 		byte d4 = SPI.transfer(0);
 		/*
-		      Serial.print("out:");
-		      Serial.print((long)d1);
-		      Serial.print("  ");
-		      Serial.print((long)d2);
-		      Serial.print("  ");
-		      Serial.print((long)d3);
-		      Serial.print("  ");
-		      Serial.println((long)d4);
+		      disp.print("out:");
+		      disp.print((long)d1);
+		      disp.print("  ");
+		      disp.print((long)d2);
+		      disp.print("  ");
+		      disp.print((long)d3);
+		      disp.print("  ");
+		      disp.println((long)d4);
 		*/
 		data = (uint32_t)d1
 		       | ((uint32_t)d2 << 8)
@@ -443,14 +520,14 @@ void test_ram()
 
 		if (data != expt)
 		{
-			Serial.print(data);
-			Serial.print("!=");
-			Serial.println(expt);
+			disp.print(data);
+			disp.print("!=");
+			disp.println(expt);
 			if (fails++ > 10) break;
 		}
 	}
 	digitalWrite(sram.cs_pin, HIGH);
-	Serial.println(F("done"));
+	disp.println(F("done"));
 	spi_end();
 }
 
@@ -507,40 +584,39 @@ const byte MB = 1 << 6;
 
 
 
-void acquire_acc(bool spi)
+bool acquire_acc(bool spi)
 {
 	if (spi)
 	{
-		Serial.println(F("spi acquire\n"));
+		disp.println(F("spi acquire\n"));
 		Acc acc = Acc(csacc);
-		acquire(acc);
+		return acquire(acc);
 
 	}
 	else
 	{
-		Serial.println(F("i2c acquire\n"));
+		disp.println(F("i2c acquire\n"));
 		Acc acc = Acc();
-		acquire(acc);
-
+		return acquire(acc);
 	}
 }
 
 byte entries;
 
-void acquire(Acc &acc)
+bool acquire(Acc &acc)
 {
 	
 	  reconf(!acc._i2c);
 
 
 	  if (!init_acc(acc))
-	    return;
+	    return false;
 
 	  use_spi = !acc._i2c;
 
 	  displayAccDetails(acc);
 
-	  Serial.println(F("flush.."));
+	  disp.println(F("flush.."));
 	  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b0000);
 	  spi_end();
 	  do_wait = false;
@@ -548,8 +624,8 @@ void acquire(Acc &acc)
 	  for(byte i = 0; i < 50; i++)
 	    acc_read();
 	  do_wait = true;
-	  Serial.print(F("start: "));
-	  Serial.println(now_string());
+	  disp.print(F("start: "));
+	  disp.println(now_string());
 	  if(use_spi)
 	    spi_acc_start();
 	  acc.writeRegister(ADXL345_REG_POWER_CTL, 0b1000);
@@ -560,8 +636,8 @@ void acquire(Acc &acc)
 	    acc_read();
 
 	  rtc_read(end_tm);
-	  Serial.print(F("\nend: "));   Serial.println(time_string(end_tm));
-	  
+	  disp.print(F("\nend: "));   disp.println(time_string(end_tm));
+	  return true;
 }
 
 
@@ -570,7 +646,7 @@ void acc_wait(void)
 	 do
 	 {
 	   byte status;
-	   //Serial.println(F("waiting for samples."));
+	   //disp.println(F("waiting for samples."));
 
 	   if(use_spi)
 	   {
@@ -615,7 +691,7 @@ void acc_read(void)
 
         entries = status & 0b111111;
         if (entries > 30 && ! just_print)
-            Serial.println(F("overflow"));
+            disp.println(F("overflow"));
     
       }
       else entries--;
@@ -638,7 +714,7 @@ void acc_read(void)
 
         entries = status & 0b111111;
         if (entries > 30 && ! just_print)
-            Serial.println(F("overflow"));
+            disp.println(F("overflow"));
       }
       else entries--;
        
@@ -655,7 +731,7 @@ void acc_read(void)
 	    const int16_t *xyz = (int16_t *) buf;
 	    char buffer[1+6*(1+5+1)];
 	    SPRINTF(buffer, "%d,%d,%d", xyz[0],xyz[1],xyz[2]);
-	    Serial.println(buffer);
+	    disp.println(buffer);
 	  }
 	  else
 	  {
@@ -667,7 +743,7 @@ void acc_read(void)
 
 	  if (!(address & 0b11111111))
 	  {
-	   Serial.print('.');//address);//);
+	   disp.print('.');//address);//);
 	  }
 
 	  address += 6;
@@ -700,10 +776,10 @@ void w_timing_end(time_t w_start_time)
 {
 	tmElements_t w_end_tm;
 	rtc_read(w_end_tm);
-	Serial.print(F("done in "));
-	Serial.print(makeTime(w_end_tm) - w_start_time);
+	disp.print(F("done in "));
+	disp.print(makeTime(w_end_tm) - w_start_time);
 	//http://pastebin.com/sfEjA94n
-	Serial.println(F("s."));
+	disp.println(F("s."));
 }
 
 
@@ -711,8 +787,8 @@ void w_timing_end(time_t w_start_time)
 #define ifsp(x)
 //#define ifsp(x) if(serial_print) {x}
 
-#define nl  {ifsp(Serial.println("");) file.print('\n');}
-#define out(x) {ifsp(Serial.print(x);) file.print(x);}
+#define nl  {ifsp(disp.println("");) file.print('\n');}
+#define out(x) {ifsp(disp.print(x);) file.print(x);}
 
 
 
@@ -727,32 +803,32 @@ void sd_out()
 	tmElements_t w_start_tm, w_end_tm;
 
 
-	Serial.print(F("ok.."));
+	disp.print(F("ok.."));
 	SDClass sd;
-	Serial.print(F("ok.."));
+	disp.print(F("ok.."));
 	if (!sd.begin()) {
-		Serial.println(F("SD err"));
+		disp.println(F("SD err"));
 		return;
 	}
-	Serial.print(F("ok.."));
+	disp.print(F("ok.."));
 
 
 	String fn = fn_time_string(end_tm) + ".csv";
-	Serial.print(F("filename:"));
-	Serial.println(fn);
+	disp.print(F("filename:"));
+	disp.println(fn);
 
 	File file = sd.open(fn.c_str(), FILE_WRITE);
 	if (!file)
 	{
-		Serial.print(F("error opening "));
-		Serial.println(fn);
+		disp.print(F("error opening "));
+		disp.println(fn);
 		return;
 	}
 
-	Serial.print(F("toread bytes:"));
-	Serial.println(toread);
+	disp.print(F("toread bytes:"));
+	disp.println(toread);
 
-	Serial.println(F("writing..."));
+	disp.println(F("writing..."));
 
 	out(time_string(end_tm));
 	nl;
@@ -796,15 +872,15 @@ void sd_out()
 			static byte x = 0;
 			if (!(x++ & 0b1111))
 			{
-				Serial.print(F("address:"));
-				Serial.print(address);
-				//Serial.print(F("sib * samplesize:"));
-				//Serial.print(sib * samplesize);
-				Serial.print(F(".."));
+				disp.print(F("address:"));
+				disp.print(address);
+				//disp.print(F("sib * samplesize:"));
+				//disp.print(sib * samplesize);
+				disp.print(F(".."));
 
 				rtc_read(w_end_tm);
-				Serial.print(address / (makeTime(w_end_tm) - w_start_time));
-				Serial.println(F(" samplebytes/second"));
+				disp.print(address / (makeTime(w_end_tm) - w_start_time));
+				disp.println(F(" samplebytes/second"));
 			}
 		}
 
@@ -834,7 +910,7 @@ void sd_out()
 
 
 			/*if(bufpos >= bufsiz)
-			   Serial.print("err");*/
+			   disp.print("err");*/
 
 			/*for (int a = 0; a < 3; a++)
 			{
@@ -889,7 +965,7 @@ void sd_out()
 /*
 void dbg_simple_ram_read()
 {
-  Serial.print(F("nsamples:")); Serial.println(nsamples);
+  disp.print(F("nsamples:")); disp.println(nsamples);
 
   unsigned long address = 0;
   sram_start(SRAM_READ, address);
@@ -908,7 +984,7 @@ void dbg_simple_ram_read()
     int16_t* xyz = (int16_t*)buf;
     char buffer[1+6*(1+5+1)];
     SPRINTF(buffer, "%d,%d,%d\n", xyz[0],xyz[1],xyz[2]);
-    Serial.println(buffer);
+    disp.println(buffer);
 
   }
 
@@ -926,27 +1002,27 @@ void test_sd(void)
 	  Sd2Card card;
 
 
-	  Serial.print(F("\nSD..."));
+	  disp.print(F("\nSD..."));
 
 	  if (!card.init()) {
-	    Serial.println(F("failed. is a card inserted?"));
+	    disp.println(F("failed. is a card inserted?"));
 	    return;
 	  }
 
 	  // print the type of card
-	  Serial.print(F("\ntype: "));
+	  disp.print(F("\ntype: "));
 	  switch (card.type()) {
 	    case SD_CARD_TYPE_SD1:
-	      Serial.println(F("SD1"));
+	      disp.println(F("SD1"));
 	      break;
 	    case SD_CARD_TYPE_SD2:
-	      Serial.println(F("SD2"));
+	      disp.println(F("SD2"));
 	      break;
 	    case SD_CARD_TYPE_SDHC:
-	      Serial.println(F("SDHC"));
+	      disp.println(F("SDHC"));
 	      break;
 	    default:
-	      Serial.println(F("Unknown"));
+	      disp.println(F("Unknown"));
 	  }
 
 
@@ -957,30 +1033,30 @@ void test_sd(void)
 
 	  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
 	  if (!volume.init(card)) {
-	    Serial.println(F("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card"));
+	    disp.println(F("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card"));
 	    return;
 	  }
 
 
 	  // print the type and size of the first FAT-type volume
 	  uint32_t volumesize;
-	  Serial.print(F("\nFAT"));
-	  Serial.println(volume.fatType(), DEC);
-	  Serial.println();
+	  disp.print(F("\nFAT"));
+	  disp.println(volume.fatType(), DEC);
+	  disp.println();
 
 	  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
 	  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
 	  volumesize *= 512;                            // SD card blocks are always 512 bytes
 
 	  volumesize /= 1024;
-	  Serial.print(F("Volume size (Mbytes): "));
+	  disp.print(F("Volume size (Mbytes): "));
 	  volumesize /= 1024;
-	  Serial.println(volumesize);
+	  disp.println(volumesize);
 
 
 
 	  {
-	  Serial.println(F("\nFiles (name, date and size in bytes): "));
+	  disp.println(F("\nFiles (name, date and size in bytes): "));
 
 	  SdFile root;
 
@@ -1014,28 +1090,28 @@ void test_sd_speed()
   RTC.read(w_start_tm);
   time_t w_start_time = makeTime(w_start_tm);
 
-  Serial.print(F("test sd speed.."));
+  disp.print(F("test sd speed.."));
   SDClass sd;
-  Serial.print(F("ok.."));
+  disp.print(F("ok.."));
   if (!sd.begin()) {
-    Serial.println(F("SD err"));
+    disp.println(F("SD err"));
     return;
   }
-  Serial.print(F("ok.."));
+  disp.print(F("ok.."));
 
   String fn = "test";
-  Serial.print(F("filename:"));
-  Serial.println(fn);
+  disp.print(F("filename:"));
+  disp.println(fn);
 
   File file = sd.open(fn.c_str(), FILE_WRITE);
   if (!file)
   {
-    Serial.print(F("error opening "));
-    Serial.println(fn);
+    disp.print(F("error opening "));
+    disp.println(fn);
     return;
   }
 
-  Serial.println(F("writing..."));
+  disp.println(F("writing..."));
 
   for(unsigned long x = 0; x < 2100000 / 3; x++)
     file.print("tes");
@@ -1071,17 +1147,17 @@ void test_sd_speed()
 void write_time(void)
 {
   SDClass sd;
-  Serial.println(F("write time.txt..."));
+  disp.println(F("write time.txt..."));
   if (sd.begin()) {
     File file = sd.open("time.txt", FILE_WRITE);
     if (! file)
-      Serial.println(F("error opening time.txt"));
+      disp.println(F("error opening time.txt"));
     file.println(now_string());
     file.flush();
     sd.end();
   }
   else
-    Serial.println(F("err"));
+    disp.println(F("err"));
 
   SPI.end();
 }
@@ -1109,32 +1185,38 @@ void setup(void)
 	digitalWrite(cssd, 1);
 	digitalWrite(csacc, 1);
 	digitalWrite(LCD_BACKLIGHT_PIN, 0);
-
+  digitalWrite(BUT_PIN, 1);
+  
 	pinMode(csram, 1);
 	pinMode(cssd, 1);
 	pinMode(csacc, 1);
-	pinMode(LCD_BACKLIGHT_PIN, OUTPUT);
-
+	pinMode(LCD_BACKLIGHT_PIN, 1);
+  
 	Serial.begin(115200);
+  lcd.LCD_init();
+  
 	divider();
-	Serial.println(F("setup..."));
+	disp.println(F("setup..."));
 	divider();
 
 	clear_i2c();
 	init_ram();
-	lcd.LCD_init(); // creates instance of LCD
+	
 }
 
 
 
 void m_acquire(bool spi)
 {
+  disp.cls();
 	divider();
-	acquire_acc(spi);
-	sd_out();
-	list_files();
+	if(acquire_acc(spi))
+  {
+	  sd_out();
+	  list_files();
+  }
+  else wait();
 }
-
 
 
 
@@ -1142,6 +1224,7 @@ void m_acquire(bool spi)
 
 void m_self_test()
 {
+  disp.cls();
 	divider();
 
 	test_rtc();
@@ -1164,7 +1247,7 @@ void m_self_test()
 
 	divider();
 
-	Serial.println(F("selftest done"));
+	disp.println(F("selftest done"));
 }
 
 
@@ -1172,28 +1255,6 @@ void m_self_test()
 
 
 
-
-// which input is our button
-const byte BUT_PIN = 14;
-
-// analog button read values
-const int BUTSEL_VAL  = 163;
-const int BUTFWD_VAL  = 525;
-const int BUTREV_VAL  = 14;
-const int BUTDEC_VAL  = 351;
-const int BUTINC_VAL  = 756;
-
-const byte BUT_THRESH  = 60;
-
-
-// mapping of analog button values for menu
-int BUT_MAP[5][2] = {
-	{BUTFWD_VAL, BUTTON_FORWARD},
-	{BUTINC_VAL, BUTTON_INCREASE},
-	{BUTDEC_VAL, BUTTON_DECREASE},
-	{BUTREV_VAL, BUTTON_BACK},
-	{BUTSEL_VAL, BUTTON_SELECT}
-};
 
 
 
@@ -1280,10 +1341,10 @@ OMMenuMgr Menu(&menu_root);
 
 
 void uiDraw(char* text, int row, int col, int len=0) {
-	/*Serial.print(row);
-	Serial.print(' ');
-	Serial.print(col);
-	Serial.print(':');*/
+	/*disp.print(row);
+	disp.print(' ');
+	disp.print(col);
+	disp.print(':');*/
 	lcd.LCD_set_XY(col*6, row);
 
 	int i = 0;
@@ -1299,16 +1360,23 @@ void uiDraw(char* text, int row, int col, int len=0) {
 		i++;
 		if( ch < '!' || ch > '~' ) ch = ' ';
 		lcd.LCD_write_char(ch, MENU_NORMAL);
-//		Serial.print(ch);
+//		disp.print(ch);
 	}
-	//Serial.println('.');
+	//disp.println('.');
 }
 
+
+void wait()
+{
+      Menu.enable(false);
+  while(Menu.checkInput() == BUTTON_NONE){};
+      Menu.enable(true);
+}
 
 void uiClear() {
 
 	lcd.LCD_clear();
-	uiDraw("Push Select for Menu",0,0);
+	uiDraw("Push"/* Select for Menu"*/,0,0);
 }
 
 
@@ -1321,7 +1389,7 @@ void menu()
 
 	Menu.setDrawHandler(uiDraw);
 	Menu.setExitHandler(uiClear);
-	Menu.setAnalogButtonPin(BUT_PIN, BUT_MAP, BUT_THRESH);
+	//Menu.setAnalogButtonPin(BUT_PIN, BUT_MAP, BUT_THRESH);
 	Menu.enable(true);
 
 	Menu.m_menuActive = true;
@@ -1335,7 +1403,7 @@ void menu()
 	{
 		byte b = Menu.checkInput();
 		/*if (b)
-			Serial.println(b);*/
+			disp.println(b);*/
 	}
 }
 
@@ -1357,7 +1425,7 @@ void m_clock()
 
     lcd.LCD_clear();
 
-    char pos = 0;//-1;
+    char pos = -1;
 
     while( pos != -2 ) {
       
@@ -1453,10 +1521,15 @@ void m_clock()
       
       const byte loc[5][2] = {{0,0},{12*2+4,0},{12*2+4+12*2+4,0},{12,3},{12+12*2+4,3}};
 
-      const char * fmt[] = {"%02d:", "%02d:", "%02d", "%02d.", "%02d"};
+      const char ends[6] = "::\0.\0";
       
       for (byte x = 0; x<5; x++)
-        SPRINTF(buf[x], fmt[x], (int)(*data[x]));
+      {
+        char fmt[6] = "%02d?";
+        fmt[4] = ends[x];
+        SPRINTF(buf[x], fmt, (int)(*data[x]));
+
+      }
 
       for (byte x = 0; x<5; x++)
       {
