@@ -645,6 +645,17 @@ void OMMenuMgr::_displayList(OMMenuItem* p_item, uint8_t p_target) {
 
 void OMMenuMgr::_displayEdit(OMMenuItem* p_item) {
 
+
+
+    // cls
+    memset(m_dispBuf, ' ', sizeof(char) * sizeof(m_dispBuf));
+    for(byte i = 0; i < OM_MENU_ROWS; i++ ) 
+        _display(m_dispBuf, i, 0, OM_MENU_COLS);
+
+
+
+
+
          // display label
 
          // copy data to buffer from progmem
