@@ -1287,6 +1287,9 @@ void m_self_test()
 
 
 
+/*nastaveni vstupu bylo presunuto do libraries/OMMenuMgr/OMMenuMgr.cpp
+pro optimalizaci naroku na pamet by bylo lepsi cely soubor presunout
+sem do sketche, aby se nemusely za behu predavat adresy callbacku a podobne*/
 
 
 
@@ -1605,6 +1608,10 @@ a pak sem prevedte testovaci menu.
  Do menu pridejte jeste moznost zaobrazovani realneho casu. Aby to cele vypadalo jako hodiny s datumem.
 
 
+
+
+kontrola plynulosti cteni ze sensoru - cteni pres interrupty a zapisovani casu pro kazdy precteny vzorek: 
+branch spi_interrupt commit 03adc4a9b139b6b605442d268841ebcf6229db17
 
 
 */
