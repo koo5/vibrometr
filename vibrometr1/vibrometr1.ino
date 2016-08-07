@@ -1,11 +1,38 @@
 #include <Wire.h>
+
+
+/* prekopano */
 #include <Adafruit_ADXL345_U.h>
+
+
+
 #include <SPI.h>
+
+
+
+/*SD knihovna: odnekud z githubu, ale vypada jako identicka s oficialni arduino. dve upravy:
+ * zrusen globalni SD objekt, misto toho se vytvari jen pro zapsani dat
+ * kvuli tomu bylo potreba opravit https://github.com/arduino/Arduino/issues/3607 */
 #include <SD.h>
+
+
+
+
+
 #include <Time.h>
 #include <DS1307RTC.h>
 #include "SRAM.h"
+
+
+
+
+/*nejake upravy, hlavne vylepsen kod detekce tlacitek, nejake nastaveni je tam prasacky nacpano - doporucoval bych celou knihovnu prekopirovat sem, pak by se daly odebrat callbacky a podobne */
 #include "OMMenuMgr.h"
+
+
+
+
+
 #include <LCD4884.h>
 
 
@@ -21,12 +48,19 @@
 
 
 const byte dispW = OM_MENU_COLS;
+
+
+/*tusim ze s menu byl na poslednim radku displaye nejaky problem*/
 const byte dispH = OM_MENU_ROWS+1;
 
+
+
+
+/*tahle trida pise zaroven na display a na seriak*/
 class Disp : public Print
 {
-  char buf[dispH][dispW];
-  byte nextX = 0;
+  char buf[dispH][dispW];//cirkularni buffer
+  byte nextX = 0;/*kam si zapise dalsi pismenko*/
   byte nextY = 0;
 
   public:
@@ -134,7 +168,7 @@ const unsigned long WIRE_RTC_FREQ = 100000;
 /*
 In [5]: (1024**2)/8/6/3200
 Out[5]: 6.826666666666666*/
-int conf_duration = 6;
+int conf_duration = 6;//sekund
 
 const byte LCD_BACKLIGHT_PIN  = 7;
 const byte BUT_PIN = 14;
@@ -250,7 +284,7 @@ void loop(void)
 
 
 
-
+/*i2c se musi resetovat po resetu arduina jinak se nekdy zasekne*/
 int I2C_ClearBus() {
 	/**
 	 * This routine turns off the I2C bus and clears it
@@ -572,12 +606,6 @@ void test_acc(bool spi)
 }
 
 
-
-/*for fifo
- * const unsigned int bufsiz = 6;
-unsigned int bufpos = 0;
-char buf[bufsiz];
-*/
 
 const byte RD = 1 << 7;
 const byte MB = 1 << 6;
@@ -1552,16 +1580,7 @@ void m_clock()
     Menu.enable(true);
     lcd.LCD_clear();
 }
-/*
-void clockclear()
-{      
-      lcd.LCD_clear();
-      lcd.LCD_write_string_big(12*2,0,":",MENU_NORMAL);
-      lcd.LCD_write_string_big(12*2+4+12*2,0,":",MENU_NORMAL);
-      lcd.LCD_write_string_big(12+12*2,3,".",MENU_NORMAL);
-}
-*/
-//void clockwrite(byte x, byte y, const char * format, byte val)
+
 
 
 
@@ -1586,8 +1605,6 @@ a pak sem prevedte testovaci menu.
  Do menu pridejte jeste moznost zaobrazovani realneho casu. Aby to cele vypadalo jako hodiny s datumem.
 
 
-uprava SD knihovny -
-https://github.com/arduino/Arduino/issues/3607
 
 
 */
